@@ -6,9 +6,13 @@ Strategy order is fixed and never reordered:
 
 `coord` hit-tests the dump: it returns None unless a visible node actually
 contains the point, so a coordinate can never "match" empty pixels. When it does
-resolve, the hit is marked `confident=False` - state() and wait_gone() must treat
-a non-confident hit as a MISS or a coord fallback makes an element look
+resolve, the hit is marked `confident=False` - exists() and state() must treat a
+non-confident hit as a MISS, or a coord fallback makes an element look
 permanently PRESENT.
+
+Node geometry (bounds_of / centre_of / visible / label) lives on Device as
+staticmethods, so a fake device in a test only needs dump(), screen_size() and
+screenshot_png().
 
 xpath keeps its own mini-matcher rather than device/xpath.py because
 selectors.yaml uses `[@text='a' or @content-desc='b']`, which the regex-based
@@ -22,7 +26,7 @@ import time
 from core.errors import DCGenError, FailureCode
 from core.log import log
 from device import ocr
-from device.driver import Found
+from device.driver import Device, Found
 
 _CLAUSE = re.compile(r"@([\w-]+)\s*=\s*'([^']*)'"
                      r"|contains\(\s*@([\w-]+)\s*,\s*'([^']*)'\s*\)")
@@ -46,11 +50,6 @@ def _pred_ok(node, preds: str) -> bool:
         if all(_clause_ok(node, c) for c in or_part.split(" and ")):
             return True
     return False
-
-
-def _visible(node) -> bool:
-    from device.driver import Device
-    return Device.bounds_of(node) is not None
 
 
 def _eval_xpath(root, expr: str) -> list:
@@ -82,7 +81,8 @@ def _eval_xpath(root, expr: str) -> list:
     elif preds is not None and preds.startswith("last()"):
         idx, preds = "last()", None
 
-    nodes = [n for n in root.iter() if tag == "*" or (n.get("class") or n.tag) == tag]
+    nodes = [n for n in root.iter()
+             if tag == "*" or (n.get("class") or n.tag) == tag]
     if preds:
         nodes = [n for n in nodes if _pred_ok(n, preds)]
     if idx == "last()":
@@ -114,7 +114,7 @@ class Ui:
         """Smallest visible node containing the point; None if empty pixels."""
         best, best_area = None, None
         for node in root.iter("node"):
-            b = self.device.bounds_of(node)
+            b = Device.bounds_of(node)
             if not b:
                 continue
             x1, y1, x2, y2 = b
@@ -184,9 +184,9 @@ class Ui:
         if nth is not None:
             nodes = nodes[nth:nth + 1]
         for node in nodes:
-            if not _visible(node):
+            if not Device.visible(node):
                 continue
-            c = self.device.centre_of(node)
+            c = Device.centre_of(node)
             if c is None:
                 continue
             return Found(by, val, c[0], c[1], node)
@@ -229,7 +229,7 @@ class Ui:
                 last_err, hit = exc, None
             if hit:
                 return hit
-            time.sleep(self.book.poll)
+            time.sleep(getattr(self.book, "poll", 0.4))
         self.device.capture_failure(f"wait_{name}", f"element {name!r} never resolved")
         raise DCGenError(FailureCode.E_UI_ELEMENT_MISSING,
                          f"element {name!r} not found in {limit}s"

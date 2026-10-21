@@ -5,15 +5,16 @@ orchestrator all read from here, so relocating output is a one-line edit.
 
 Layout (under output.dir, which defaults to ./outputs):
 
-    tokens.txt     one token per line
-    evs.txt        email:password:token:user_id
-    pending.txt    email:password:token:instance:epoch:state
-    locked.txt     same shape, for the phone wall
-    report.csv     run report
-    run.lock       single-writer guard
-    state/         per-account JSON records
-    shots/         failure screenshots + raw dumps
-    logs/          emulator-<i>.log, mitm-<i>.log
+    tokens.txt        one token per line
+    evs.txt           email:password:token:user_id
+    pending.txt       email:password:token:instance:epoch:state
+    locked.txt        same shape, for the phone wall
+    report.csv        run report
+    credentials.txt   email:password
+    run.lock          single-writer guard
+    state/            per-account JSON records
+    shots/            failure screenshots + raw dumps
+    logs/             emulator-<i>.log, mitm-<i>.log
 """
 from __future__ import annotations
 
@@ -29,6 +30,7 @@ class Paths:
     root: Path = field(default_factory=Path.cwd)
     out_dir: Path | None = None
     selectors_file: Path | None = None
+    credentials_file: Path | None = None
 
     def __post_init__(self) -> None:
         self.root = Path(self.root).resolve()
@@ -77,6 +79,11 @@ class Paths:
     @property
     def report(self) -> Path:
         return self.out_dir / "report.csv"
+
+    @property
+    def credentials(self) -> Path:
+        return Path(self.credentials_file) if self.credentials_file \
+            else self.out_dir / "credentials.txt"
 
     @property
     def run_lock(self) -> Path:

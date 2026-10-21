@@ -22,6 +22,8 @@ VALID_HUMAN = ("park", "block", "assist")
 VALID_BACKENDS = ("avd",)
 VALID_PROXY_MODES = ("rotate", "sticky", "fixed")
 VALID_EMAIL_SOURCES = ("catchall", "gmail-plus", "imap", "tempmail-api", "manual")
+VALID_NAME_STYLES = ("adjective_noun", "email_local", "list")
+VALID_USERNAME_STYLES = ("word_digits", "email_local", "digits")
 
 
 class ConfigError(RuntimeError):
@@ -81,6 +83,44 @@ class EmailCfg:
     inbox_search: str = "https://mail.google.com/mail/u/0/#search/to%3A{addr}"
     verify_mode: str = "paste"
     verify_timeout: int = 1800
+
+
+@dataclass
+class AccountCfg:
+    password: str = "S3cretPassw0rd!"
+    #: {n} becomes the account number, so "dcgen{n}" -> dcgen1@domain
+    tag_pattern: str = "dcgen{n}"
+    start_index: int = 1
+
+
+@dataclass
+class IdentityCfg:
+    name_style: str = "adjective_noun"
+    display_names: list = field(default_factory=list)
+    name_separator: str = ""
+    name_max_len: int = 20
+    name_adjectives: list = field(default_factory=list)
+    name_nouns: list = field(default_factory=list)
+
+    username_style: str = "word_digits"
+    username_prefix: str = ""
+    username_digits: int = 6
+    username_separator: str = ""
+    username_max_len: int = 20
+    username_words: list = field(default_factory=list)
+
+    used_names_file: str = "outputs/state/used_names.txt"
+    used_usernames_file: str = "outputs/state/used_usernames.txt"
+
+
+@dataclass
+class DobCfg:
+    year_min: int = 1995
+    year_max: int = 2005
+    day_max: int = 28
+    pin_year: int = 0
+    pin_month: int = 0
+    pin_day: int = 0
 
 
 @dataclass
@@ -152,7 +192,6 @@ class RunCfg:
 class OutputCfg:
     dir: str = "outputs"
     format: str = "both"
-    credentials_file: str = ""
 
 
 @dataclass
@@ -161,6 +200,9 @@ class Config:
     device: DeviceCfg = field(default_factory=DeviceCfg)
     net: NetCfg = field(default_factory=NetCfg)
     email: EmailCfg = field(default_factory=EmailCfg)
+    account: AccountCfg = field(default_factory=AccountCfg)
+    identity: IdentityCfg = field(default_factory=IdentityCfg)
+    dob: DobCfg = field(default_factory=DobCfg)
     human: HumanCfg = field(default_factory=HumanCfg)
     captcha: CaptchaCfg = field(default_factory=CaptchaCfg)
     sms: SmsCfg = field(default_factory=SmsCfg)
@@ -189,7 +231,8 @@ class Config:
         """(account_index, instance) round-robin across run.instances."""
         insts = self.run.instances or [0]
         n = len(insts)
-        return [(1 + k, insts[k % n]) for k in range(self.run.count)]
+        return [(self.account.start_index + k, insts[k % n])
+                for k in range(self.run.count)]
 
     def as_dict(self) -> dict:
         d = asdict(self)
@@ -201,8 +244,8 @@ class Config:
 # ---------------------------------------------------------------------------
 # loading
 # ---------------------------------------------------------------------------
-SECTIONS = ("emulator", "device", "net", "email", "human", "captcha", "sms",
-            "app", "flow", "run", "output")
+SECTIONS = ("emulator", "device", "net", "email", "account", "identity", "dob",
+            "human", "captcha", "sms", "app", "flow", "run", "output")
 
 
 def _resolve(path) -> Path:
@@ -230,7 +273,7 @@ def _fill(obj, data, section) -> None:
 
 
 def _env_overrides() -> dict:
-    """DCGEN_NET__MITM=1 -> {'net.mitm': '1'} (coerced by _apply_override)."""
+    """DCGEN_NET__MITM=1 -> {'net.mitm': '1'} (coerced in _apply_override)."""
     out: dict[str, str] = {}
     for raw, value in os.environ.items():
         if not raw.startswith("DCGEN_"):
@@ -302,13 +345,8 @@ def load(path=None, overrides: dict | None = None) -> Config:
     for key, value in merged.items():
         _apply_override(cfg, key, value)
 
-    cfg.paths = Paths(root=p.parent.parent if p.parent.name == "configs" else p.parent,
-                      out_dir=None).__class__(
-        root=p.parent.parent if p.parent.name == "configs" else p.parent,
-        out_dir=(p.parent.parent if p.parent.name == "configs" else p.parent)
-        / cfg.output.dir)
-    if cfg.output.credentials_file:
-        cfg.paths.credentials = Path(cfg.output.credentials_file)
+    root = p.parent.parent if p.parent.name == "configs" else p.parent
+    cfg.paths = Paths(root=root, out_dir=root / cfg.output.dir)
 
     validate(cfg)
     return cfg
@@ -337,23 +375,32 @@ def validate(cfg: Config) -> None:
     if cfg.email.source == "catchall" and not cfg.email.domain:
         raise ConfigError("[email] source 'catchall' needs [email] domain")
     if cfg.email.source == "gmail-plus" and "@" not in cfg.email.base:
-        raise ConfigError("[email] source 'gmail-plus' needs [email] base = you@gmail.com")
+        raise ConfigError("[email] 'gmail-plus' needs [email] base = you@gmail.com")
     if cfg.email.verify_mode not in ("paste", "api"):
         raise ConfigError("[email] verify_mode must be 'paste' or 'api'")
+    if not cfg.account.password:
+        raise ConfigError("[account] password must not be empty")
+    if not cfg.account.tag_pattern:
+        raise ConfigError("[account] tag_pattern must not be empty")
+    if cfg.identity.name_style not in VALID_NAME_STYLES:
+        raise ConfigError(f"[identity] name_style must be one of {VALID_NAME_STYLES}")
+    if cfg.identity.username_style not in VALID_USERNAME_STYLES:
+        raise ConfigError(f"[identity] username_style must be one of "
+                          f"{VALID_USERNAME_STYLES}")
+    if cfg.dob.year_min > cfg.dob.year_max:
+        raise ConfigError("[dob] year_min is after year_max")
+    if not (1 <= cfg.dob.day_max <= 28):
+        raise ConfigError("[dob] day_max must be 1..28 (28 dodges month length)")
     if cfg.human.mode not in VALID_HUMAN:
         raise ConfigError(f"[human] mode must be one of {VALID_HUMAN}")
     if cfg.captcha.mode not in VALID_CAPTCHA:
         raise ConfigError(f"[captcha] mode must be one of {VALID_CAPTCHA}")
     if cfg.sms.enabled and not (cfg.sms.provider and cfg.sms.key):
         raise ConfigError("[sms] enabled but provider/key are empty")
-    if "@" not in cfg.app.package:
+    if "." not in cfg.app.package:
         raise ConfigError("[app] package must look like com.example.app")
     if cfg.device.width < 320 or cfg.device.height < 320:
         raise ConfigError("[device] width/height look wrong")
-    for idx in cfg.run.instances:
-        _, _, proxy_port = cfg.instance_ports(idx)
-        if proxy_port >= cfg.instance_ports(idx + 1)[2] - 1 and False:
-            pass
 
 
 DEFAULT_YAML = """# dc-gen-android :: configuration
@@ -365,6 +412,8 @@ net:
 email:
   source: "catchall"
   domain: ""
+account:
+  password: "change-me"
 captcha:
   mode: "human"
 app:

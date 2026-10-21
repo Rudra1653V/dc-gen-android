@@ -45,6 +45,35 @@ email:
   verify_mode: "paste"      # paste | api
   verify_timeout: 1800
 
+account:
+  password: "S3cretPassw0rd!"
+  tag_pattern: "dcgen{n}"   # {n} -> account number
+  start_index: 1
+
+identity:
+  name_style: "adjective_noun"   # adjective_noun | email_local | list
+  display_names: []
+  name_separator: ""
+  name_max_len: 20
+  name_adjectives: []
+  name_nouns: []
+  username_style: "word_digits"  # word_digits | email_local | digits
+  username_prefix: ""
+  username_digits: 6
+  username_separator: ""
+  username_max_len: 20
+  username_words: []
+  used_names_file: "outputs/state/used_names.txt"
+  used_usernames_file: "outputs/state/used_usernames.txt"
+
+dob:
+  year_min: 1995
+  year_max: 2005
+  day_max: 28               # 28 dodges month length
+  pin_year: 0
+  pin_month: 0
+  pin_day: 0
+
 human:
   mode: "park"              # park | block | assist
   auto_captcha: true
