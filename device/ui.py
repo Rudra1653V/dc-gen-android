@@ -1,18 +1,18 @@
 """Semantic UI layer: resolves selectors.yaml strategy chains against a live dump.
 
 Strategy order is fixed and never reordered:
-    res -> text -> text_contains -> desc -> xpath -> coord -> ocr
-
-Includes a minimal, self-contained xpath subset so this file has no dependency
-on device/xpath.py:
-
-    //Tag                     //*                     //Tag[3]      //Tag[last()]
-    //*[@attr='v']            //*[contains(@attr,'v')]
-    //*[contains(@text,'a') or contains(@text,'b')]
-    (//Tag[@x='y'])[2]
+    res -> text -> text_contains -> desc -> desc_contains -> label ->
+    label_contains -> class -> xpath -> coord -> ocr -> foreground
 
 `coord` hit-tests the dump: it returns None unless a visible node actually
-contains the point, so a coordinate can never "match" empty pixels.
+contains the point, so a coordinate can never "match" empty pixels. When it does
+resolve, the hit is marked `confident=False` - state() and wait_gone() must treat
+a non-confident hit as a MISS or a coord fallback makes an element look
+permanently PRESENT.
+
+xpath keeps its own mini-matcher rather than device/xpath.py because
+selectors.yaml uses `[@text='a' or @content-desc='b']`, which the regex-based
+matcher in xpath.py does not support.
 """
 from __future__ import annotations
 
@@ -21,17 +21,15 @@ import time
 
 from core.errors import DCGenError, FailureCode
 from core.log import log
-from device.driver import Found
 from device import ocr
+from device.driver import Found
 
-_TAG_RE = re.compile(r"^[A-Za-z_][\w.]*$")
 _CLAUSE = re.compile(r"@([\w-]+)\s*=\s*'([^']*)'"
                      r"|contains\(\s*@([\w-]+)\s*,\s*'([^']*)'\s*\)")
 
 
-def _tag_of(node) -> str:
-    """uiautomator puts every widget in <node> with the class in an attribute."""
-    return node.get("class") or node.tag
+def _attr(node, name: str) -> str:
+    return node.get(name) or ""
 
 
 def _clause_ok(node, clause: str) -> bool:
@@ -39,8 +37,8 @@ def _clause_ok(node, clause: str) -> bool:
     if not m:
         return False
     if m.group(1) is not None:
-        return (node.get(m.group(1)) or "") == m.group(2)
-    return m.group(4).lower() in (node.get(m.group(3)) or "").lower()
+        return _attr(node, m.group(1)) == m.group(2)
+    return m.group(4).lower() in _attr(node, m.group(3)).lower()
 
 
 def _pred_ok(node, preds: str) -> bool:
@@ -51,12 +49,8 @@ def _pred_ok(node, preds: str) -> bool:
 
 
 def _visible(node) -> bool:
-    b = node.get("bounds") or ""
-    m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", b)
-    if not m:
-        return False
-    x1, y1, x2, y2 = (int(g) for g in m.groups())
-    return x2 > x1 and y2 > y1
+    from device.driver import Device
+    return Device.bounds_of(node) is not None
 
 
 def _eval_xpath(root, expr: str) -> list:
@@ -88,7 +82,7 @@ def _eval_xpath(root, expr: str) -> list:
     elif preds is not None and preds.startswith("last()"):
         idx, preds = "last()", None
 
-    nodes = [n for n in root.iter() if tag == "*" or _tag_of(n) == tag]
+    nodes = [n for n in root.iter() if tag == "*" or (n.get("class") or n.tag) == tag]
     if preds:
         nodes = [n for n in nodes if _pred_ok(n, preds)]
     if idx == "last()":
@@ -104,20 +98,21 @@ class Ui:
         self.device = device
         self.book = book
         self._png: bytes | None = None
-        self._png_fresh = False
+        self._png_gen: float = -1.0
 
     # ---- resolution ------------------------------------------------------
     def _screen(self) -> bytes:
         """One screencap per dump generation, not one per ocr strategy."""
-        if self.device.dump_is_fresh and self._png is not None:
+        gen = getattr(self.device, "dump_generation", 0.0)
+        if self._png is not None and gen == self._png_gen:
             return self._png
         self._png = self.device.screenshot_png()
+        self._png_gen = gen
         return self._png
 
     def _hit_test(self, root, x: int, y: int):
         """Smallest visible node containing the point; None if empty pixels."""
-        best = None
-        best_area = None
+        best, best_area = None, None
         for node in root.iter("node"):
             b = self.device.bounds_of(node)
             if not b:
@@ -131,9 +126,35 @@ class Ui:
         return best
 
     def _scaled_coord(self, value) -> tuple[int, int]:
-        space = (self.book.meta.get("coordinate_space") or [1080, 1920])
         w, h = self.device.screen_size()
+        space = self.book.coordinate_space
         return (int(value[0] * w / space[0]), int(value[1] * h / space[1]))
+
+    @staticmethod
+    def _candidates(root, by: str, val) -> list:
+        nodes = list(root.iter("node"))
+        if by == "xpath":
+            return _eval_xpath(root, str(val))
+        if by == "res":
+            return [n for n in nodes if _attr(n, "resource-id") == val
+                    or _attr(n, "resource-id").endswith("/" + str(val))]
+        if by == "text":
+            return [n for n in nodes if _attr(n, "text") == val]
+        if by == "text_contains":
+            return [n for n in nodes if str(val) in _attr(n, "text")]
+        if by == "desc":
+            return [n for n in nodes if _attr(n, "content-desc") == val]
+        if by == "desc_contains":
+            return [n for n in nodes if str(val) in _attr(n, "content-desc")]
+        if by == "label":                       # R1: text OR content-desc
+            return [n for n in nodes if _attr(n, "text") == val
+                    or _attr(n, "content-desc") == val]
+        if by == "label_contains":
+            return [n for n in nodes if str(val) in _attr(n, "text")
+                    or str(val) in _attr(n, "content-desc")]
+        if by == "class":
+            return [n for n in nodes if _attr(n, "class") == val]
+        return []
 
     def _try(self, strat, root) -> Found | None:
         by, val = strat.by, strat.value
@@ -141,28 +162,28 @@ class Ui:
         if by == "coord":
             x, y = self._scaled_coord(val)
             node = self._hit_test(root, x, y)
-            return Found("coord", val, x, y, node) if node is not None else None
+            if node is None:
+                return None
+            return Found("coord", val, x, y, node, confident=False)
+
+        if by == "foreground":
+            fg = (self.device.foreground() or "").lower()
+            if str(val).lower() not in fg:
+                return None
+            w, h = self.device.screen_size()
+            return Found("foreground", val, w // 2, h // 2, None)
 
         if by == "ocr":
             hit = ocr.find_text(self._screen(), str(val))
             if not hit:
                 return None
-            return Found("ocr", val, hit[0], hit[1], None)
+            return Found("ocr", val, hit[0], hit[1], None, confident=False)
 
-        if by == "xpath":
-            expr = str(val)
-        elif by == "res":
-            expr = f"//*[@resource-id='{val}']"
-        elif by == "text":
-            expr = f"//*[@text='{val}']"
-        elif by == "text_contains":
-            expr = f"//*[contains(@text,'{val}')]"
-        elif by == "desc":
-            expr = f"//*[@content-desc='{val}']"
-        else:
-            return None
-
-        for node in _eval_xpath(root, expr):
+        nodes = self._candidates(root, by, val)
+        nth = getattr(strat, "nth", None)
+        if nth is not None:
+            nodes = nodes[nth:nth + 1]
+        for node in nodes:
             if not _visible(node):
                 continue
             c = self.device.centre_of(node)
@@ -171,7 +192,7 @@ class Ui:
             return Found(by, val, c[0], c[1], node)
         return None
 
-    def find(self, name: str) -> Found | None:
+    def find(self, name: str, strict: bool = False) -> Found | None:
         el = self.book.elements.get(name)
         if el is None:
             raise DCGenError(FailureCode.E_UI_ELEMENT_MISSING,
@@ -187,19 +208,23 @@ class Ui:
                 continue
             for strat in el.strategies:
                 hit = self._try(strat, root)
-                if hit:
-                    return hit
+                if hit is None:
+                    continue
+                if strict and not hit.confident:
+                    continue
+                return hit
             return None
         return None
 
-    def wait(self, name: str, timeout: float | None = None) -> Found:
+    def wait(self, name: str, timeout: float | None = None,
+             strict: bool = False) -> Found:
         el = self.book.elements[name]
         limit = timeout or el.timeout
         deadline = time.time() + limit
         last_err = None
         while time.time() < deadline:
             try:
-                hit = self.find(name)
+                hit = self.find(name, strict=strict)
             except DCGenError as exc:       # bad dump: keep polling, do not abort
                 last_err, hit = exc, None
             if hit:
@@ -211,10 +236,11 @@ class Ui:
                          + (f" (last dump error: {last_err})" if last_err else ""))
 
     def exists(self, name: str) -> bool:
+        """STRICT presence. A coord fallback is not 'present'."""
         if name not in self.book.elements:
             return False
         try:
-            return self.find(name) is not None
+            return self.find(name, strict=True) is not None
         except DCGenError:
             return False
 
@@ -252,8 +278,16 @@ class Ui:
     # ---- states ----------------------------------------------------------
     def state(self) -> str | None:
         try:
-            matches = [n for n, s in self.book.states.items()
-                       if all(self.exists(d) for d in s.detect)]
+            matches = []
+            for name, s in self.book.states.items():
+                if not s.detect:
+                    continue
+                if s.require_all:
+                    ok = all(self.exists(d) for d in s.detect)
+                else:
+                    ok = any(self.exists(d) for d in s.detect)
+                if ok:
+                    matches.append(name)
         except DCGenError:
             return None
         if not matches:
@@ -261,12 +295,11 @@ class Ui:
         return max(matches, key=lambda n: (self.book.states[n].priority,
                                            len(self.book.states[n].detect)))
 
-    def wait_state(self, want: str | tuple[str, ...],
-                   timeout: float | None = None) -> str:
-        wants = (want,) if isinstance(want, str) else want
+    def wait_state(self, want, timeout: float | None = None) -> str:
+        wants = (want,) if isinstance(want, str) else tuple(want)
         limit = timeout or self.book.states[wants[0]].timeout
         deadline = time.time() + limit
-        seen: set[str] = set()
+        seen: set = set()
         while time.time() < deadline:
             current = self.state()
             if current:

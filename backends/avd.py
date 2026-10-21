@@ -181,11 +181,6 @@ class AvdBackend:
                 except Exception:
                     pass
 
-    def reboot(self, idx: int) -> None:
-        self.adb_run(idx, "reboot", check=False)
-        time.sleep(5)
-        self.wait_booted(idx)
-
     def _unlock(self, idx: int) -> None:
         self.adb_run(idx, "shell", "input", "keyevent", "82", timeout=10)
         self.adb_run(idx, "shell", "wm", "dismiss-keyguard", timeout=10)
