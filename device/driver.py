@@ -306,8 +306,14 @@ class Device:
         self.shell(f"pm clear {self.cfg.app.package}", check=False)
         self.invalidate()
 
-    def open_url(self, url: str) -> None:
-        self.shell(f"am start -a android.intent.action.VIEW -d '{url}'", check=False)
+    def open_url(self, url: str, package: str | None = None) -> None:
+        """`package` pins the handler when several browsers are installed;
+        email_verify passes None and lets Android choose."""
+        cmd = f"am start -a android.intent.action.VIEW -d '{url}'"
+        if package:
+            cmd += f" -p {package}"
+        self.shell(cmd, check=False)
+        self.invalidate()
 
     # ---- token in shared prefs -------------------------------------------
     def prefs_token(self) -> str | None:

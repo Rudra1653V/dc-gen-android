@@ -69,7 +69,7 @@ def _boot(cfg, backend, book):
             log(f"{cfg.net.proxy_file} has no usable proxies - going direct", "warn")
 
     for idx in cfg.run.instances:
-        backend.start(idx, headless=True)
+        backend.start(idx, headless=backend.headless)
     for idx in cfg.run.instances:
         backend.wait_booted(idx)
         backend.probe_props(idx)

@@ -115,6 +115,10 @@ def cmd_doctor(cfg, backend, args) -> int:
                                 f"{cfg.app.package} is not installed")
             else:
                 log(f"{cfg.avd_name(idx)}: {cfg.app.package} present, booted")
+                
+    if cfg.captcha.mode == "human" and not shutil.which("scrcpy"):
+        warnings.append("scrcpy missing - no window to solve the captcha in "
+                        "(brew install scrcpy), or pass --windowed")
 
     # ---- APK pin ---------------------------------------------------------
     if cfg.app.apk:

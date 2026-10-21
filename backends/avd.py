@@ -29,7 +29,7 @@ class AvdBackend:
         self._procs: dict[int, subprocess.Popen] = {}
         self._windows: dict[int, subprocess.Popen] = {}
         self._proxies: dict[int, str] = {}
-        self._props_ok: bool | None = None
+        self._props_ok: dict[int, bool] = {}
 
     @staticmethod
     def _which(name: str) -> str:
@@ -134,7 +134,7 @@ class AvdBackend:
         proxy_port = self._proxies.get(idx)
         if proxy_port:
             cmd += ["-http-proxy", f"http://10.0.2.2:{proxy_port}"]
-        if self._props_ok is not False:
+        if self._props_ok.get(idx) is not False:
             for k, v in ident_mod.for_instance(idx).boot_props().items():
                 cmd += ["-prop", f"{k}={v}"]
 
@@ -230,8 +230,18 @@ class AvdBackend:
         time.sleep(1)
         self.adb_run(idx, "shell", "settings", "put", "secure",
                      "android_id", ident.android_id, check=False)
-        if self._props_ok is False:
+
+        if self._props_ok.get(idx) is False:
+            # build.prop is read by init AT BOOT, so the rewrite is inert until
+            # we reboot. Without this the whole flow runs on the image's props
+            # while the account claims to be a Pixel 7.
             self._rewrite_build_prop(idx, ident)
+            self.reboot(idx)
+            bad = self.verify_props(idx, ident)
+            if bad:
+                log(f"{self.instance(idx).name} prop spoof incomplete: {bad}", "warn")
+            else:
+                self._props_ok[idx] = True
         log(f"identity set: {ident.short()}")
 
     def set_locale_tz(self, idx: int) -> None:
@@ -245,10 +255,10 @@ class AvdBackend:
                 and self._getprop(idx, "persist.sys.locale") == self.cfg.device.locale)
 
     def probe_props(self, idx: int) -> bool:
-        self._props_ok = self._getprop(idx, "ro.product.model") == \
+        ok = self._getprop(idx, "ro.product.model") == \
             ident_mod.for_instance(idx).model
-        return self._props_ok
-
+        self._props_ok[idx] = ok
+        return ok
     #: Most-authoritative first. init resolves ro.product.model from the FIRST
     #: partition in ro.product.property_source_order (default odm,product,vendor,
     #: system) that defines it. /system is LAST, so writing only /system/build.prop
@@ -317,6 +327,8 @@ class AvdBackend:
         self.adb_run(idx, "reboot", check=False)
         deadline = time.time() + 90
         while time.time() < deadline:          # wait for it to actually go down
+            if not self._serial_present(idx):
+                break
             if self._getprop(idx, "sys.boot_completed") != "1":
                 break
             time.sleep(1)

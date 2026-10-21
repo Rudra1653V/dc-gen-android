@@ -6,7 +6,10 @@ e.g. DCGEN_NET__MITM=1 or DCGEN_RUN__COUNT=25.
 """
 from __future__ import annotations
 
+import json
 import os
+import re
+
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
@@ -324,7 +327,35 @@ def _yaml_hint(path, exc) -> str:
             f"  {pad} | " + " " * max(0, col) + "^\n"
             "  usual causes: a tab where spaces belong, or an unquoted value "
             "containing ':' or '{'")
+APK_PIN = "configs/apk.json"
+_VERSION_RE = re.compile(r"\d+(?:\.\d+)*")
 
+
+def _apply_apk_pin(cfg: Config, root: Path) -> None:
+    """Fill app.version / build_number / apk from the pinned APK record.
+
+    X-Super-Properties carries client_version and client_build_number, so a
+    stale or absent value makes the register probe and the API-login path
+    impersonate a build Discord does not know. The pinned APK is the single
+    source of truth, so derive from it instead of hand-editing config.
+    """
+    pin = root / APK_PIN
+    if not pin.exists():
+        return
+    try:
+        data = json.loads(pin.read_text())
+    except Exception:
+        return
+    if cfg.app.version in ("", "0.0.0"):
+        m = _VERSION_RE.search(str(data.get("version", "")))
+        if m:
+            cfg.app.version = m.group(0)
+    if not cfg.app.build_number:
+        cfg.app.build_number = int(data.get("build_number") or 0)
+    if not cfg.app.apk:
+        apk = data.get("apk")
+        if apk and Path(apk).exists():
+            cfg.app.apk = apk
 
 def load(path=None, overrides: dict | None = None) -> Config:
     p = _resolve(path)
@@ -347,6 +378,7 @@ def load(path=None, overrides: dict | None = None) -> Config:
 
     root = p.parent.parent if p.parent.name == "configs" else p.parent
     cfg.paths = Paths(root=root, out_dir=root / cfg.output.dir)
+    _apply_apk_pin(cfg, root)
 
     validate(cfg)
     return cfg
