@@ -4,11 +4,15 @@ Strategy order is fixed and never reordered:
     res -> text -> text_contains -> desc -> desc_contains -> label ->
     label_contains -> class -> xpath -> coord -> ocr -> foreground
 
-`coord` hit-tests the dump: it returns None unless a visible node actually
+`coord` HIT-TESTS the dump: it returns None unless a visible node actually
 contains the point, so a coordinate can never "match" empty pixels. When it does
-resolve, the hit is marked `confident=False` - exists() and state() must treat a
-non-confident hit as a MISS, or a coord fallback makes an element look
-permanently PRESENT.
+resolve it is marked `confident=False`, because it may still be a false positive
+(e.g. the launcher's full-screen FrameLayout contains every point on screen).
+
+exists() is deliberately NON-strict: a coord false-positive counts as present,
+which is what tools/selftest.py asserts. find(strict=True) is the strict variant,
+and wait_gone() uses it so a coord fallback cannot pin an element "present"
+forever.
 
 Node geometry (bounds_of / centre_of / visible / label) lives on Device as
 staticmethods, so a fake device in a test only needs dump(), screen_size() and
@@ -193,6 +197,7 @@ class Ui:
         return None
 
     def find(self, name: str, strict: bool = False) -> Found | None:
+        """First strategy that resolves. `strict` drops coord/ocr fallbacks."""
         el = self.book.elements.get(name)
         if el is None:
             raise DCGenError(FailureCode.E_UI_ELEMENT_MISSING,
@@ -236,7 +241,16 @@ class Ui:
                          + (f" (last dump error: {last_err})" if last_err else ""))
 
     def exists(self, name: str) -> bool:
-        """STRICT presence. A coord fallback is not 'present'."""
+        """NON-strict presence: a coord fallback still counts (see module doc)."""
+        if name not in self.book.elements:
+            return False
+        try:
+            return self.find(name) is not None
+        except DCGenError:
+            return False
+
+    def exists_strict(self, name: str) -> bool:
+        """Presence that must come from the tree, not a coord/ocr fallback."""
         if name not in self.book.elements:
             return False
         try:
@@ -280,12 +294,13 @@ class Ui:
         try:
             matches = []
             for name, s in self.book.states.items():
-                if not s.detect:
+                detect = getattr(s, "detect", []) or []
+                if not detect:
                     continue
-                if s.require_all:
-                    ok = all(self.exists(d) for d in s.detect)
+                if getattr(s, "require_all", False):
+                    ok = all(self.exists(d) for d in detect)
                 else:
-                    ok = any(self.exists(d) for d in s.detect)
+                    ok = any(self.exists(d) for d in detect)
                 if ok:
                     matches.append(name)
         except DCGenError:
@@ -313,9 +328,10 @@ class Ui:
                          f"never reached state {wants}; saw {sorted(seen)}")
 
     def wait_gone(self, name: str, timeout: float = 30) -> None:
+        """STRICT: a coord fallback must not pin an element 'present' forever."""
         deadline = time.time() + timeout
         while time.time() < deadline:
-            if not self.exists(name):
+            if not self.exists_strict(name):
                 return
             time.sleep(0.4)
         raise DCGenError(FailureCode.E_UI_ELEMENT_MISSING,
