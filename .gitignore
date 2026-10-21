@@ -1,8 +1,11 @@
 .venv/
 __pycache__/
 *.pyc
+.DS_Store
 configs/config.yaml
 configs/apk.json
 outputs/
+logs/
 proxies.txt
 *.apk
+*.xapkdc-gen-android/

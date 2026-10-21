@@ -1012,3 +1012,112 @@ WARNING      | Emulator client has not yet been configured.. Call configure me f
 INFO         | removeAll
 WARNING      | Netsim Wifi dns:///localhost:51233 is gone due to Stream removed (CANCELLED)
 INFO         | ipv6:%5B::1%5D:51233: Got goaway [2] err=UNAVAILABLE:GOAWAY received; Error code: 2; Debug Text: Cancelling all calls {http2_error:2}
+INFO         | Android emulator version 37.2.12.0 (build_id 16428233) (CL:N/A)
+INFO         | Graphics backend: gfxstream
+INFO         | Found systemPath /Users/bhoomiagro/Library/Android/sdk/system-images/android-34/google_apis/arm64-v8a/
+INFO         | Increasing RAM size to 2560MB
+WARNING      | System image is writable
+INFO         | Guest GLES Driver: Auto (ext controls)
+INFO         | emuglConfig_init: vulkan_mode_selected:swiftshader gles_mode_selected:swangle
+INFO         | Checking system compatibility:
+INFO         |   Checking: hasSufficientDiskSpace
+INFO         |      Ok: Disk space requirements to run avd: `dcgen-0` are met
+INFO         |   Checking: hasSufficientHwGpu
+INFO         |      Ok: Hardware GPU compatibility checks are not required
+INFO         |   Checking: hasSufficientSystem
+INFO         |      Ok: System requirements to run avd: `dcgen-0` are met
+WARNING      | unexpected '-prop' value ('ro.product.model=Pixel 7'), only 'qemu.*' properties are supported
+WARNING      | unexpected '-prop' value ('ro.product.brand=google'), only 'qemu.*' properties are supported
+WARNING      | unexpected '-prop' value ('ro.product.manufacturer=Google'), only 'qemu.*' properties are supported
+WARNING      | unexpected '-prop' value ('ro.product.device=panther'), only 'qemu.*' properties are supported
+WARNING      | unexpected '-prop' value ('ro.product.name=panther'), only 'qemu.*' properties are supported
+WARNING      | unexpected '-prop' value ('ro.build.fingerprint=google/panther/panther:13/TQ3A.230805.001/10316531/7db7da4e:user/release-keys'), only 'qemu.*' properties are supported
+INFO         | Storing crashdata in: /tmp/android-bhoomiagro/emu-crash-37.2.12.db, detection is enabled for process: 23945
+INFO         | Initializing gfxstream backend
+INFO         | startOpenglesRendererImpl: gpu info
+INFO         | 
+INFO         | initIcdPaths: ICD set to 'swiftshader', using Swiftshader ICD
+INFO         | Setting ICD filenames for the loader = /Users/bhoomiagro/Library/Android/sdk/emulator/lib64/vulkan/vk_swiftshader_icd.json
+INFO         | SharedLibrary::open for [/Users/bhoomiagro/Library/Android/sdk/emulator/qemu/darwin-aarch64/lib64/vulkan/libvulkan.dylib]
+INFO         | Added library: /Users/bhoomiagro/Library/Android/sdk/emulator/qemu/darwin-aarch64/lib64/vulkan/libvulkan.dylib
+INFO         | Enabling Vulkan portability.
+INFO         | Selecting Vulkan device: SwiftShader Device (LLVM 10.0.0), Version: 1.3.0
+INFO         | Using Vulkan externalMemoryMode: OpaqueFd for VkEmulation
+INFO         | Format VK_FORMAT_G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16 does not support YCbCr sampler conversion
+INFO         | Initializing VkEmulation features:
+INFO         |     glInteropSupported: false
+INFO         |     useDeferredCommands: true
+INFO         |     createResourceWithRequirements: true
+INFO         |     useVulkanComposition: false
+INFO         |     useVulkanNativeSwapchain: false
+INFO         |     enable guestRenderDoc: false
+INFO         |     ASTC LDR emulation mode: Gpu
+INFO         |     enable ETC2 emulation: true
+INFO         |     enable Ycbcr emulation: false
+INFO         |     guestVulkanOnly: false
+INFO         |     useDedicatedAllocations: false
+INFO         |     guestVulkanMaxApiVersion: 1.3.0
+INFO         |     enableProtectedMemoryEmulation: false
+INFO         | Graphics Adapter Vendor Google (Google Inc. (Google))
+INFO         | Graphics Adapter Android Emulator OpenGL ES Translator (ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver-5.0.0))
+INFO         | Graphics API Version OpenGL ES 3.0 (OpenGL ES 3.1.0 (ANGLE 2.1.1 git hash: fbf66f49c7cc))
+INFO         | Graphics API Extensions GL_OES_EGL_sync GL_OES_EGL_image GL_OES_EGL_image_external GL_OES_depth24 GL_OES_depth32 GL_OES_element_index_uint GL_OES_texture_float GL_OES_texture_float_linear GL_OES_compressed_paletted_texture GL_OES_compressed_ETC1_RGB8_texture GL_OES_depth_texture GL_OES_texture_half_float GL_OES_texture_half_float_linear GL_OES_packed_depth_stencil GL_OES_vertex_half_float GL_OES_standard_derivatives GL_OES_texture_npot GL_OES_rgb8_rgba8 GL_OVR_multiview2 GL_EXT_color_buffer_float GL_EXT_color_buffer_half_float GL_EXT_texture_format_BGRA8888 GL_APPLE_texture_format_BGRA8888 GL_EXT_draw_buffers_indexed GL_EXT_clip_cull_distance 
+INFO         | Graphics Device Extensions N/A
+INFO         | Disabling sparse binding feature support
+INFO         | Sending adb public key [QAAAAB1SW3XL/we3EZOEmTeRShgm+hB45Qd5VRGMkPHhy3OXB+seChAsm/ohn6N4Vmh2J0rONVSi8yZBfqfrFDBmjZ4J4iZ6IBj0BIX+NooW7BKG25ci8XogUkXCDh7SbaFc1ud51MP8L+y0BXQ9Inn8TPx+d1kHbuDt2qsjDpS0nnufZGJXCc7BTtPdt03HTk59YOqMnNsUYCG8VZThsopJaTyn7/VlkAKqrOoT0W/yloOCEhqiA1SbsTM1LMOLNOoelLODN7mmk0rkJAwCgbvDyoPZeDrjwKk8gsN8KXg5cxgskOxwnn4U2B2A9YbzxkokkJdylRk/ocX2j3GdkIxRM1TbGrywKk4mxbA7277YsI+YTN3PANaulj/Zd67JUB7YntC7we764wwSBN6cnx7K/7kYTJhLq5fcxD/IruEAx/1SpxUks+zv3MUwvGm/nINcF7cBmHIoNMTp/vbriYgNisJFILdKWOHmn58DKnKz+kN+BJ1g7lB6CbGiP0ClrFaXRvpjGQ87Cm+5dVgLx/XhAV0k+SQ6fmeAFUndbbduz9Imzn4eaemj5YFbSfTW7LLqor/8bGzz8Af0UcRfB2aIA/mceqb5B2jEa8qyWmr6B5N3YE9SsVyc2w5aaBkdqpgdvtRTTv3l+VmtE57uw39Ro+6sU+f9jvFKeer42N6m3pjf4756qgEAAQA= bhoomiagro@unknown]
+INFO         | Userspace boot properties:
+INFO         |   androidboot.boot_devices=a003600.virtio_mmio
+INFO         |   androidboot.dalvik.vm.heapsize=576m
+INFO         |   androidboot.debug.hwui.renderer=skiagl
+INFO         |   androidboot.debug.sf.nobootanimation=1
+INFO         |   androidboot.hardware=ranchu
+INFO         |   androidboot.hardware.gltransport=pipe
+INFO         |   androidboot.hardware.vulkan=ranchu
+INFO         |   androidboot.logcat=*:V
+INFO         |   androidboot.opengles.version=196609
+INFO         |   androidboot.qemu=1
+INFO         |   androidboot.qemu.adb.pubkey=QAAAAB1SW3XL/we3EZOEmTeRShgm+hB45Qd5VRGMkPHhy3OXB+seChAsm/ohn6N4Vmh2J0rONVSi8yZBfqfrFDBmjZ4J4iZ6IBj0BIX+NooW7BKG25ci8XogUkXCDh7SbaFc1ud51MP8L+y0BXQ9Inn8TPx+d1kHbuDt2qsjDpS0nnufZGJXCc7BTtPdt03HTk59YOqMnNsUYCG8VZThsopJaTyn7/VlkAKqrOoT0W/yloOCEhqiA1SbsTM1LMOLNOoelLODN7mmk0rkJAwCgbvDyoPZeDrjwKk8gsN8KXg5cxgskOxwnn4U2B2A9YbzxkokkJdylRk/ocX2j3GdkIxRM1TbGrywKk4mxbA7277YsI+YTN3PANaulj/Zd67JUB7YntC7we764wwSBN6cnx7K/7kYTJhLq5fcxD/IruEAx/1SpxUks+zv3MUwvGm/nINcF7cBmHIoNMTp/vbriYgNisJFILdKWOHmn58DKnKz+kN+BJ1g7lB6CbGiP0ClrFaXRvpjGQ87Cm+5dVgLx/XhAV0k+SQ6fmeAFUndbbduz9Imzn4eaemj5YFbSfTW7LLqor/8bGzz8Af0UcRfB2aIA/mceqb5B2jEa8qyWmr6B5N3YE9SsVyc2w5aaBkdqpgdvtRTTv3l+VmtE57uw39Ro+6sU+f9jvFKeer42N6m3pjf4756qgEAAQA= bhoomiagro@unknown
+INFO         |   androidboot.qemu.avd_name=dcgen-0
+INFO         |   androidboot.qemu.camera_hq_edge_processing=0
+INFO         |   androidboot.qemu.camera_protocol_ver=1
+INFO         |   androidboot.qemu.cpuvulkan.version=4206592
+INFO         |   androidboot.qemu.gltransport.drawFlushInterval=800
+INFO         |   androidboot.qemu.gltransport.name=pipe
+INFO         |   androidboot.qemu.hwcodec.avcdec=2
+INFO         |   androidboot.qemu.hwcodec.hevcdec=2
+INFO         |   androidboot.qemu.hwcodec.vpxdec=2
+INFO         |   androidboot.qemu.settings.system.screen_off_timeout=2147483647
+INFO         |   androidboot.qemu.skin=1080x1920
+INFO         |   androidboot.qemu.virtiowifi=1
+INFO         |   androidboot.qemu.vsync=60
+INFO         |   androidboot.serialno=EMULATOR37X2X12X0
+INFO         |   androidboot.vbmeta.digest=7d083757a5e20cd0c568182e509f6d02da844505ce73ef80b2f1ada3f02ae18c
+INFO         |   androidboot.vbmeta.hash_alg=sha256
+INFO         |   androidboot.vbmeta.size=6656
+INFO         |   androidboot.verifiedbootstate=orange
+INFO         |   androidboot.veritymode=enforcing
+INFO         | Monitoring duration of emulator setup.
+INFO         | Successfully initialized netsim WiFi
+INFO         | Activated packet streamer for bluetooth emulation
+INFO         | Setting display: 0 configuration to: 1080x1920, dpi: 320x320 
+INFO         | setDisplayActiveConfig: id:0, 1080x1920
+INFO         | emulatorSetupEnvironment: Environment scene is not required
+INFO         | Loading snapshot 'clean'...
+WARNING      | Failed to create process resource for puid 13.
+WARNING      | Failed to create process resource for puid 14.
+WARNING      | Failed to create process resource for puid 15.
+WARNING      | Failed to create process resource for puid 16.
+WARNING      | Failed to create process resource for puid 17.
+WARNING      | Failed to create process resource for puid 18.
+WARNING      | Failed to create process resource for puid 19.
+WARNING      | Failed to create process resource for puid 20.
+WARNING      | Failed to create process resource for puid 21.
+INFO         | Successfully loaded snapshot 'clean' using 2968 ms
+INFO         | Wait for emulator (pid 23945) 20 seconds to shutdown gracefully before kill;you can set environment variable ANDROID_EMULATOR_WAIT_TIME_BEFORE_KILL(in seconds) to change the default value (20 seconds)
+
+USER_INFO    | Snapshots have been disabled by the user, save request is ignored.
+INFO         | Saving snapshot 'default_boot' took 0 ms
+WARNING      | Emulator client has not yet been configured.. Call configure me first!
+INFO         | removeAll
+WARNING      | Netsim Wifi dns:///localhost:50251 is gone due to Stream removed (CANCELLED)
+INFO         | ipv6:%5B::1%5D:50251: Got goaway [2] err=UNAVAILABLE:GOAWAY received; Error code: 2; Debug Text: Cancelling all calls {http2_error:2}

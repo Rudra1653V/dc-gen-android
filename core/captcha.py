@@ -15,8 +15,8 @@ R10b: it is paced like a person. Settle before touching anything, clear the
 field, type character by character with jitter, pause before submitting, pause
 between rounds. Never fire the whole thing in one burst.
 
-R11: the answer field sits inside the challenge card, so read_challenge SKIPS
-the field's own node - otherwise a stale answer gets read back as the word.
+R11: the answer field sits inside the challenge card, so read_challenge SKIPS the
+field's own node - otherwise a stale answer gets read back as the word.
 
 FALLBACKS
   vision - screenshot -> VLM -> JSON action list (drag / tap).
@@ -34,7 +34,9 @@ import time
 import urllib.request
 from shutil import which
 
-from core.ui import UiError
+from core.errors import DCGenError, FailureCode
+from core.log import log
+from device.driver import Device
 
 # menu entries are ungrounded; matched by label substring, then by position
 A11Y_NEEDLES = ("accessibility challenge", "accessibility text", "text challenge")
@@ -85,22 +87,27 @@ Rules:
 """
 
 
-def capture(dev) -> bytes:
-    return dev.capture_png()
+def _text(n) -> str:
+    return n.get("text") or ""
 
 
-def prompt_of(dev, sel) -> str:
-    node, _ = dev.resolve_name(sel, "captcha_prompt")
-    return (node.text or node.desc).strip() if node else ""
+def _desc(n) -> str:
+    return n.get("content-desc") or ""
 
 
-def _pause(rng, span):
+def _label(n) -> str:
+    return _desc(n) or _text(n)
+
+
+def _pause(rng, span) -> None:
     time.sleep(rng.uniform(*span))
 
 
-def _in_box(node, box=CHALLENGE_BOX) -> bool:
-    x1, y1, x2, y2 = box
-    return x1 <= node.cx <= x2 and y1 <= node.cy <= y2
+def _in_box(n, box=CHALLENGE_BOX) -> bool:
+    c = Device.centre_of(n)
+    if c is None:
+        return False
+    return box[0] <= c[0] <= box[2] and box[1] <= c[1] <= box[3]
 
 
 def _clean(s: str) -> str:
@@ -108,7 +115,12 @@ def _clean(s: str) -> str:
 
 
 def _same_bounds(a, b) -> bool:
-    return a and b and a.bounds == b.bounds
+    return bool(a is not None and b is not None
+                and a.get("bounds") == b.get("bounds"))
+
+
+def _state(ui) -> list:
+    return ui.state() or []
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +150,7 @@ def _ocr_tsv(png: bytes, box=CHALLENGE_BOX, psm="6"):
     return out
 
 
-def read_challenge(dev, sel, log=print, skip=None) -> str:
+def read_challenge(ui, skip=None) -> str:
     """Read the accessibility word. Tree first, OCR second.
 
     R11: `skip` is the answer field's own node - never read a stale answer back
@@ -146,14 +158,15 @@ def read_challenge(dev, sel, log=print, skip=None) -> str:
     """
     # 1. real nodes inside the card, minus the chrome and minus the field
     cands = []
-    for n in dev.nodes():
-        if not _in_box(n) or not n.text:
+    for n in Device.nodes(ui.device.dump()):
+        if not _in_box(n) or not _text(n):
             continue
         if _same_bounds(n, skip):
             continue
-        word = _clean(n.text)
+        word = _clean(_text(n))
         if len(word) >= 3 and word.lower() not in BLOCKLIST:
-            cands.append((n.text.strip(), n.cx, n.cy))
+            c = Device.centre_of(n)
+            cands.append((_text(n).strip(), c[0], c[1]))
     if cands:
         # the word is usually the most central text node in the card
         cands.sort(key=lambda c: (abs(c[1] - 540) + abs(c[2] - 900)))
@@ -162,7 +175,7 @@ def read_challenge(dev, sel, log=print, skip=None) -> str:
         return answer
 
     # 2. OCR the card, minus the chrome
-    words = _ocr_tsv(capture(dev))
+    words = _ocr_tsv(ui.device.screenshot_png())
     keep = [w for w in words if w[0].lower() not in BLOCKLIST
             and len(_clean(w[0])) >= 3]
     if not keep:
@@ -175,119 +188,120 @@ def read_challenge(dev, sel, log=print, skip=None) -> str:
 # ---------------------------------------------------------------------------
 # the accessibility text challenge
 # ---------------------------------------------------------------------------
-def _three_dot(dev, sel, log=print) -> bool:
+def _three_dot(ui) -> bool:
     for name in ("captcha_menu", "captcha_about"):
-        try:
-            node, _ = dev.tap_el(sel, name)
-            log(f"   three-dot via {name} at ({node.cx}, {node.cy})")
+        if ui.tap_if(name):
+            log(f"   three-dot via {name}")
             time.sleep(1.2)
             return True
-        except UiError:
-            continue
     return False
 
 
-def open_accessibility(dev, sel, log=print) -> bool:
+def open_accessibility(ui) -> bool:
     """Three-dot -> Accessibility Challenge. True once the word is up."""
-    if not _three_dot(dev, sel, log):
+    if not _three_dot(ui):
         log("   no three-dot on the wrapper")
         return False
 
-    nodes = [n for n in dev.nodes() if n.clickable and (n.text or n.desc)]
+    nodes = [n for n in Device.nodes(ui.device.dump())
+             if n.get("clickable") == "true" and _label(n)]
     # 1. by label
     for n in nodes:
-        label = (n.text or n.desc).lower()
+        label = _label(n).lower()
         if any(nd in label for nd in A11Y_NEEDLES):
-            log(f"   menu item -> {n.label!r} at ({n.cx}, {n.cy})")
-            dev.tap(n.cx, n.cy)
+            c = Device.centre_of(n)
+            log(f"   menu item -> {_label(n)!r} at {c}")
+            ui.device.tap_xy(*c)
             time.sleep(1.8)
             return True
     # 2. by position: it is the 2nd of 5
-    ordered = sorted(nodes, key=lambda n: (n.cy, n.cx))
+    ordered = sorted(nodes, key=lambda n: (Device.centre_of(n)[1],
+                                           Device.centre_of(n)[0]))
     if len(ordered) >= 2:
-        n = ordered[1]
-        log(f"   menu item by position (2nd of {len(ordered)}) -> {n.label!r}")
-        dev.tap(n.cx, n.cy)
+        c = Device.centre_of(ordered[1])
+        log(f"   menu item by position (2nd of {len(ordered)}) -> {_label(ordered[1])!r}")
+        ui.device.tap_xy(*c)
         time.sleep(1.8)
         return True
     return False
 
 
-def _text_challenge_up(dev, sel) -> bool:
-    return dev.present(sel, "captcha_next")
+def _text_challenge_up(ui) -> bool:
+    return ui.exists_strict("captcha_next")
 
 
-def _clear_answer(dev, sel, log=print):
-    field, _ = dev.resolve_name(sel, "captcha_answer_field")
-    if field:
-        dev.tap(field.cx, field.cy)
+def _clear_answer(ui) -> None:
+    field = ui.find("captcha_answer_field")
+    if field is not None:
+        ui.device.tap_xy(field.x, field.y)
         time.sleep(0.25)
-    clear, _ = dev.resolve_name(sel, "clear_button")
-    if clear:
-        dev.tap(clear.cx, clear.cy)
+    clear = ui.find("clear_button")
+    if clear is not None:
+        ui.device.tap_xy(clear.x, clear.y)
         time.sleep(0.2)
     else:
         for _ in range(12):
-            dev.keyevent(67)               # DEL - never navigates
+            ui.device.shell("input keyevent 67", check=False)   # DEL - never navigates
 
 
-def type_like_human(dev, text, rng, log=print):
-    """Character by character, with a human gap. `input text` decodes %s as a
-    space, so a single character is safe to send verbatim."""
+def type_like_human(dev, text, rng) -> None:
+    """Character by character, with a human gap."""
     for ch in text:
-        dev.input_text(ch)
+        dev.type_text(ch)
         time.sleep(rng.uniform(*HUMAN_KEY_GAP))
     log(f"   typed {text!r}")
 
 
-def solve_text(dev, sel, log=print, max_rounds=MAX_ROUNDS, rng=None) -> str:
+def solve_text(ui, max_rounds=MAX_ROUNDS, rng=None) -> str:
     """Loop: read one word, type it, submit, repeat until the wrapper is gone.
 
     hCaptcha serves the accessibility word several times in a row, so a single
     pass is not enough. Returns 'solved', 'unsolved', or 'unavailable'.
     """
     rng = rng or random
-    if not open_accessibility(dev, sel, log):
+    if not open_accessibility(ui):
         return "unavailable"
-    if not _text_challenge_up(dev, sel):
+    if not _text_challenge_up(ui):
         log("   no Next after opening the menu - is the text challenge up?")
         time.sleep(1.5)
 
     for rnd in range(1, max_rounds + 1):
-        if not _text_challenge_up(dev, sel):
+        if not _text_challenge_up(ui):
             log(f"   round {rnd}: no Next - reopening the accessibility menu")
-            if not open_accessibility(dev, sel, log):
+            if not open_accessibility(ui):
                 return "unsolved"
 
         _pause(rng, HUMAN_SETTLE)          # look at the word first
 
-        field, _ = dev.resolve_name(sel, "captcha_answer_field")
-        answer = read_challenge(dev, sel, log, skip=field)
+        field = ui.find("captcha_answer_field")
+        answer = read_challenge(ui, skip=(field.node if field else None))
         if not answer:
             log(f"   round {rnd}: nothing readable")
             _pause(rng, HUMAN_BETWEEN)
             continue
 
-        _clear_answer(dev, sel, log)
-        type_like_human(dev, answer, rng, log)
+        _clear_answer(ui)
+        type_like_human(ui.device, answer, rng)
         _pause(rng, HUMAN_PRE_SUBMIT)
 
-        try:
-            node = dev.tap_el(sel, "captcha_next")[0]
-            log(f"   round {rnd}/{max_rounds}: {answer!r} -> Next at ({node.cx}, {node.cy})")
-        except UiError:
+        hit = ui.find("captcha_next")
+        if hit is not None:
+            log(f"   round {rnd}/{max_rounds}: {answer!r} -> Next at ({hit.x}, {hit.y})")
+            ui.device.tap_xy(hit.x, hit.y)
+        else:
             log(f"   round {rnd}: no Next - pressing ENTER")
-            dev.keyevent(66)
+            ui.device.enter()
 
         # wait for a pass, or for hCaptcha to hand us the next word
         deadline = time.time() + 12
         while time.time() < deadline:
-            if "captcha_wrapper" not in dev.state(sel):
+            st = _state(ui)
+            if "captcha_wrapper" not in st:
                 for name in ("pending_verify", "logged_in", "human_check"):
-                    if name in dev.state(sel):
+                    if name in st:
                         log(f"   round {rnd}: PASSED -> {name}")
                         return "solved"
-            if dev.resolve_name(sel, "captcha_error")[0]:
+            if ui.exists_strict("captcha_error"):
                 log(f"   round {rnd}: rejected, next word")
                 break
             time.sleep(0.5)
@@ -317,7 +331,7 @@ def _extract_json(text: str):
         return json.loads(m.group(0)) if m else None
 
 
-def vision_plan(png: bytes, log=print):
+def vision_plan(png: bytes):
     url, key, model = _vision_cfg()
     if not key:
         log("   no CAPTCHA_VISION_KEY set - skipping vision")
@@ -350,7 +364,7 @@ def vision_plan(png: bytes, log=print):
     return plan
 
 
-def execute_plan(dev, plan, log=print) -> bool:
+def execute_plan(dev, plan) -> bool:
     actions = plan.get("actions") or []
     for a in actions:
         if a.get("type") == "drag":
@@ -358,51 +372,60 @@ def execute_plan(dev, plan, log=print) -> bool:
             dev.swipe(f[0], f[1], t[0], t[1], a.get("ms", 800))
             time.sleep(0.7)
         elif a.get("type") == "tap":
-            dev.tap(*a["at"])
+            dev.tap_xy(*a["at"])
             time.sleep(0.5)
     return bool(actions)
 
 
-def solve_vision(dev, sel, log=print, rounds=3) -> str:
+def solve_vision(ui, rounds=3) -> str:
+    dev = ui.device
     for r in range(rounds):
-        before = prompt_of(dev, sel)
-        plan = vision_plan(capture(dev), log)
-        if not plan or not execute_plan(dev, plan, log):
+        before = _prompt(ui)
+        plan = vision_plan(dev.screenshot_png())
+        if not plan or not execute_plan(dev, plan):
             return "unsolved"
         time.sleep(2.0)
         for name in ("pending_verify", "logged_in", "human_check"):
-            if name in dev.state(sel):
+            if name in _state(ui):
                 log(f"   vision solved -> {name}")
                 return "solved"
-        after = prompt_of(dev, sel)
+        after = _prompt(ui)
         if after and after != before:
             log(f"   round {r + 1}: new challenge -> {after!r}")
             continue
     return "unsolved"
 
 
+def _prompt(ui) -> str:
+    hit = ui.find("captcha_prompt")
+    if hit is None or hit.node is None:
+        return ""
+    return _label(hit.node).strip()
+
+
 # ---------------------------------------------------------------------------
 # driver
 # ---------------------------------------------------------------------------
-def solve(dev, sel, log=print, mode="auto", max_rounds=MAX_ROUNDS) -> str:
+def solve(ui, mode="auto", max_rounds=MAX_ROUNDS) -> str:
     """mode: auto | text | vision | skip | probe."""
     if mode == "skip":
         return "parked"
     if mode == "probe":
-        _three_dot(dev, sel, log)
-        for n in [x for x in dev.nodes() if x.clickable]:
-            log(f"      menu clickable: {n}")
+        _three_dot(ui)
+        for n in [x for x in Device.nodes(ui.device.dump())
+                  if x.get("clickable") == "true"]:
+            log(f"      menu clickable: {_label(n)!r} at {Device.centre_of(n)}")
         return "parked"
 
     if mode in ("auto", "text"):
-        outcome = solve_text(dev, sel, log, max_rounds)
+        outcome = solve_text(ui, max_rounds)
         if outcome == "solved":
             return "solved"
         if mode == "text":
             return outcome
 
     if mode in ("auto", "vision"):
-        if solve_vision(dev, sel, log) == "solved":
+        if solve_vision(ui) == "solved":
             return "solved"
 
     return "unsolved"

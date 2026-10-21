@@ -1,5 +1,5 @@
 # cp configs/config.example.yaml configs/config.yaml
-# Env overrides: DCGEN_<section>__<attr>, e.g. DCGEN_EMAIL__DOMAIN=you.dev
+# Env overrides: DCGEN_<section>__<attr>, e.g. DCGEN_NET__MITM=1
 
 emulator:
   prefix: "dcgen-"
@@ -30,30 +30,65 @@ device:
 
 net:
   proxy_file: "proxies.txt"
-  proxy_mode: "rotate"
+  proxy_mode: "rotate"      # rotate | sticky | fixed
   no_proxy: false
-  mitm: false
+  mitm: false               # true = capture the token off the wire
   handshake_timeout: 10
   dead_cooldown: 60
 
 email:
-  source: "catchall"
+  source: "catchall"        # catchall | gmail-plus | imap | tempmail-api | manual
   domain: ""
   base: ""
   inbox_open: "auto"
   inbox_search: "https://mail.google.com/mail/u/0/#search/to%3A{addr}"
-  verify_mode: "paste"
+  verify_mode: "paste"      # paste | api
   verify_timeout: 1800
 
+account:
+  password: "S3cretPassw0rd!"
+  tag_pattern: "dcgen{n}"   # {n} -> account number
+  start_index: 1
+
+identity:
+  name_style: "adjective_noun"   # adjective_noun | email_local | list
+  display_names: []
+  name_separator: ""
+  name_max_len: 20
+  name_adjectives: []
+  name_nouns: []
+  username_style: "word_digits"  # word_digits | email_local | digits
+  username_prefix: ""
+  username_digits: 6
+  username_separator: ""
+  username_max_len: 20
+  username_words: []
+  used_names_file: "outputs/state/used_names.txt"
+  used_usernames_file: "outputs/state/used_usernames.txt"
+
+dob:
+  year_min: 1995
+  year_max: 2005
+  day_max: 28               # 28 dodges month length
+  pin_year: 0
+  pin_month: 0
+  pin_day: 0
+
 human:
-  mode: "park"
+  mode: "park"              # park | block | assist
   auto_captcha: true
   captcha_timeout: 900
   webhook: ""
 
+captcha:
+  mode: "human"             # human | auto | skip
+  human_timeout_s: 600
+  beep: true
+  auto_rounds: 10
+
 sms:
   enabled: false
-  provider: ""
+  provider: ""              # smspool | 5sim | sms-activate
   key: ""
   country: ""
   max_price: 0.0
@@ -68,11 +103,17 @@ app:
   activity: "com.discord/.main.MainActivity"
   browser: "com.android.chrome"
 
+flow:
+  retries: 2
+  submit_timeout_s: 45
+  captcha_wait_s: 25
+  fresh_per_account: true
+
 run:
   count: 1
   batch: 0
-  concurrency: 0
-  instances: [0, 1]
+  concurrency: 0            # 0 = one worker per instance
+  instances: [0]
   backend: "avd"
   dry_run: false
   report: false
@@ -80,7 +121,12 @@ run:
   keep_open: false
   fresh_app: false
   rotate_identity: false
+  infinite: false
   from_step: "auto"
   min_submit_gap: 20.0
   caffeinate: true
   dashboard: "plain"
+
+output:
+  dir: "outputs"
+  format: "both"
