@@ -259,9 +259,7 @@ class Signup:
                         return name
                 time.sleep(0.8)
             log(f"   submit still pending, round {r + 1}/3")
-        raise DCGenError(FailureCode.E_SUBMIT_TIMEOUT
-                         if hasattr(FailureCode, "E_SUBMIT_TIMEOUT")
-                         else FailureCode.E_UI_ELEMENT_MISSING,
+        raise DCGenError(FailureCode.E_SUBMIT_TIMEOUT,
                          f"no post-submit screen after 3 x {window}s")
 
     # ---- steps -----------------------------------------------------------

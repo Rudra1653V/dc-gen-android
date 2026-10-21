@@ -8,4 +8,4 @@ outputs/
 logs/
 proxies.txt
 *.apk
-*.xapk
+*.xapkdc-gen-android/
