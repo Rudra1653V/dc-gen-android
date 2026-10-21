@@ -1,0 +1,401 @@
+# =============================================================================
+# dc-gen-android :: selectors.yaml
+# Screen: 1080x1920 @ 320dpi   Discord 349.9   package com.discord
+# =============================================================================
+#
+# RULES. Every one of these was bought with a real failure, do not relax them.
+#
+#  R1  A Button's label lives in content-desc, NOT text. React Native puts real
+#      text only on Text nodes. Every locator for an interactive node must match
+#      text OR content-desc ("label" / "label_contains" kinds).
+#
+#  R2  Every state's detect list must be DISJOINT from every other state's.
+#      Loose text_contains chains match the wrong screen. Where disjointness is
+#      impossible, separate by priority and make the specific state higher.
+#
+#  R3  Never hardcode a y that sits below a helper line that can appear or
+#      disappear. Anchor on text, keep the coord only as last resort.
+#
+#  R4  Strategy order matters: most specific first. Button-scoped xpath before
+#      any text_contains, or a prose TextView earlier in document order wins.
+#
+#  R5  A coord that contains no node is a MISS when STRICT. resolve() fabricates
+#      a synthetic node otherwise, so a coord fallback makes an element look
+#      permanently PRESENT. Every "is this on screen?" check must be strict.
+#
+#  R6  The identify screen defaults to the PHONE tab. 'IN +91' present == phone
+#      mode. Tap the Email tab, then BLUR the field: Discord only drops the
+#      phone chrome once the value has been validated, and blur forces it.
+#
+#  R7  The create-account username is NOT reliably pre-filled. Always check;
+#      type our own if empty, and wait for "is available".
+#
+#  R8  The form screen has ONE Clear button and it belongs to the username.
+#      _fill must scope Clear to the target field by vertical distance.
+#
+#  R9  The NOTIFICATION SHADE is a separate window that swallows every tap and
+#      makes state() report []. ensure_ready() runs before every press and snap.
+#      Never press BACK blind: only while the shade is the focused window.
+#
+#  R10 The hCaptcha accessibility TEXT challenge is the primary solve, and it is
+#      served REPEATEDLY. solve_text must loop, one word per round, at a human
+#      pace, until the wrapper is gone - not fire once and check.
+#
+#  R11 The answer field lives inside the challenge card, so read_challenge must
+#      SKIP the field's own node or a stale answer gets read back as the word.
+#
+# =============================================================================
+
+version: 10
+screen: {w: 1080, h: 1920}
+pkg: com.discord
+
+# -----------------------------------------------------------------------------
+# ELEMENTS
+# -----------------------------------------------------------------------------
+elements:
+
+  # ---- shade / keyguard -----------------------------------------------------
+  shade_marker:
+    note: "R9 - the pulled-down notification shade, not Discord"
+    strategies:
+      - {kind: label_contains, value: "Unlock for all features"}
+      - {kind: label_contains, value: "Battery"}
+
+  # ---- 00 welcome -----------------------------------------------------------
+  welcome_title:
+    strategies:
+      - {kind: label, value: "WELCOME TO DISCORD"}
+      - {kind: label_contains, value: "WELCOME TO DISCORD"}
+
+  register_button:
+    strategies:
+      - {kind: label, value: "Register"}
+      - {kind: xpath, value: "//android.widget.Button[@text='Register' or @content-desc='Register']"}
+      - {kind: coord, value: [540, 1680]}
+
+  login_button:
+    strategies:
+      - {kind: label, value: "Log In"}
+      - {kind: xpath, value: "//android.widget.Button[@text='Log In' or @content-desc='Log In']"}
+
+  # ---- 01 identify ----------------------------------------------------------
+  identify_title:
+    strategies:
+      - {kind: label, value: "Enter phone or email"}
+      - {kind: label_contains, value: "Enter phone or email"}
+
+  email_tab:
+    note: "tab is a clickable android.view.View carrying the label in content-desc"
+    strategies:
+      - {kind: xpath, value: "//android.view.View[@text='Email' or @content-desc='Email']"}
+      - {kind: coord, value: [786, 401]}
+
+  phone_tab:
+    strategies:
+      - {kind: xpath, value: "//android.view.View[@text='Phone' or @content-desc='Phone']"}
+      - {kind: coord, value: [294, 401]}
+
+  country_code:
+    note: "presence of this == phone mode. Check it STRICTLY (R5)."
+    strategies:
+      - {kind: xpath, value: "//android.widget.Button[contains(@content-desc,'IN +')]"}
+      - {kind: coord, value: [106, 594]}
+
+  field_label:
+    note: "'Phone Number' in phone mode, 'Email' in email mode"
+    strategies:
+      - {kind: coord, value: [540, 512]}
+
+  email_field:
+    strategies:
+      - {kind: class, value: "android.widget.EditText", nth: 0}
+      - {kind: coord, value: [589, 594]}
+
+  email_next_button:
+    strategies:
+      - {kind: xpath, value: "//android.widget.Button[@text='Next' or @content-desc='Next']"}
+      - {kind: label, value: "Next"}
+      - {kind: coord, value: [540, 746]}
+
+  # ---- 03 name --------------------------------------------------------------
+  name_title:
+    strategies:
+      - {kind: label_contains, value: "your name?"}
+
+  display_name_field:
+    strategies:
+      - {kind: class, value: "android.widget.EditText", nth: 0}
+      - {kind: coord, value: [540, 456]}
+
+  name_next_button:
+    strategies:
+      - {kind: xpath, value: "//android.widget.Button[@text='Next' or @content-desc='Next']"}
+      - {kind: label, value: "Next"}
+      - {kind: coord, value: [540, 648]}
+
+  name_skip_button:
+    strategies:
+      - {kind: xpath, value: "//android.widget.Button[@text='Skip' or @content-desc='Skip']"}
+      - {kind: label, value: "Skip"}
+
+  # ---- 04 form --------------------------------------------------------------
+  form_title:
+    strategies:
+      - {kind: label_contains, value: "create an account"}
+
+  username_field:
+    strategies:
+      - {kind: class, value: "android.widget.EditText", nth: 0}
+      - {kind: coord, value: [540, 456]}
+
+  username_ok:
+    strategies:
+      - {kind: label_contains, value: "is available"}
+
+  username_bad:
+    strategies:
+      - {kind: label_contains, value: "taken"}
+      - {kind: label_contains, value: "unavailable"}
+      - {kind: label_contains, value: "not available"}
+      - {kind: label_contains, value: "too short"}
+      - {kind: label_contains, value: "too long"}
+
+  username_hint:
+    strategies:
+      - {kind: label_contains, value: "Only use letters"}
+
+  password_field:
+    strategies:
+      - {kind: class, value: "android.widget.EditText", nth: 1}
+      - {kind: coord, value: [516, 692]}
+
+  password_view_button:
+    strategies:
+      - {kind: label, value: "View Password"}
+
+  form_next_button:
+    strategies:
+      - {kind: xpath, value: "//android.widget.Button[@text='Next' or @content-desc='Next']"}
+      - {kind: label, value: "Next"}
+      - {kind: coord, value: [540, 844]}
+
+  # ---- 05 dob ---------------------------------------------------------------
+  dob_title:
+    strategies:
+      - {kind: label_contains, value: "how old are you"}
+
+  dob_button:
+    strategies:
+      - {kind: label, value: "Date of Birth"}
+      - {kind: xpath, value: "//android.widget.Button[contains(@content-desc,'Date of Birth')]"}
+      - {kind: coord, value: [540, 456]}
+
+  dob_value:
+    note: "After Confirm this reads 'Date of Birth, 09/20/2000'"
+    strategies:
+      - {kind: desc_contains, value: "Date of Birth,"}
+
+  optin_checkbox:
+    strategies:
+      - {kind: class, value: "android.widget.CheckBox"}
+      - {kind: coord, value: [540, 592]}
+
+  # R4: Button-scoped xpath FIRST. The agreement prose TextView contains
+  # "Create Account" and sits at y=688, above the button at y=800.
+  create_account_button:
+    strategies:
+      - {kind: xpath, value: "//android.widget.Button[@text='Create Account' or @content-desc='Create Account']"}
+      - {kind: label, value: "Create Account"}
+      - {kind: coord, value: [540, 800]}
+
+  # ---- 06 dob picker (modal window) ----------------------------------------
+  dob_wheel_year:
+    strategies:
+      - {kind: coord, value: [682, 1009]}
+
+  dob_wheel_month:
+    strategies:
+      - {kind: coord, value: [441, 1009]}
+
+  dob_wheel_day:
+    strategies:
+      - {kind: coord, value: [584, 1009]}
+
+  dob_confirm:
+    strategies:
+      - {kind: xpath, value: "//android.widget.Button[@text='Confirm' or @content-desc='Confirm']"}
+      - {kind: label, value: "Confirm"}
+      - {kind: coord, value: [842, 1251]}
+
+  dob_cancel:
+    strategies:
+      - {kind: label, value: "Cancel"}
+
+  # ---- errors ---------------------------------------------------------------
+  phone_error:
+    note: "'Phone number is invalid...' - fires when an email is validated in phone mode"
+    strategies:
+      - {kind: label_contains, value: "Phone number is invalid"}
+
+  dob_error:
+    note: "contains 'not valid', NOT 'invalid' - there is a space"
+    strategies:
+      - {kind: label_contains, value: "valid date of birth"}
+
+  error_banner:
+    strategies:
+      - {kind: label_contains, value: "not valid"}
+      - {kind: label_contains, value: "invalid"}
+      - {kind: label_contains, value: "already registered"}
+      - {kind: label_contains, value: "too many"}
+
+  # ---- 07 human check (native interstitial) --------------------------------
+  human_check_title:
+    strategies:
+      - {kind: label_contains, value: "Are you human?"}
+      - {kind: label_contains, value: "not a robot"}
+
+  human_confirm_button:
+    strategies:
+      - {kind: xpath, value: "//android.widget.Button[@text='Confirm' or @content-desc='Confirm']"}
+      - {kind: label, value: "Confirm"}
+      - {kind: coord, value: [540, 1808]}
+
+  # ---- 08/09 captcha --------------------------------------------------------
+  # The Arkose iframe is opaque: WebView with no children, only Close is
+  # addressable, Skip is coord-only. Tapping that Skip dismisses the iframe and
+  # exposes the native hCaptcha wrapper below, which is fully addressable.
+  captcha_webview:
+    strategies:
+      - {kind: class, value: "android.webkit.WebView"}
+
+  captcha_close:
+    strategies:
+      - {kind: desc, value: "Close"}
+      - {kind: coord, value: [76, 196]}
+
+  captcha_iframe_skip:
+    note: "coord-only escape hatch for the opaque Arkose iframe"
+    strategies:
+      - {kind: coord, value: [784, 1247]}
+
+  captcha_prompt:
+    note: "resource-id prompt-question - only exists in the native wrapper"
+    strategies:
+      - {kind: res, value: "prompt-question"}
+      - {kind: label_contains, value: "complete the path"}
+      - {kind: label_contains, value: "Drag the correct"}
+
+  # R10: the three-dot that opens the accessibility menu
+  captcha_menu:
+    strategies:
+      - {kind: label_contains, value: "About hCaptcha"}
+      - {kind: res, value: "menu-info"}
+      - {kind: coord, value: [277, 1302]}
+
+  # R10: "Next" replaces "Skip Challenge" once the text challenge is on
+  captcha_next:
+    strategies:
+      - {kind: label, value: "Next"}
+      - {kind: label, value: "Submit"}
+      - {kind: label, value: "Verify"}
+      - {kind: xpath, value: "//android.widget.Button[@text='Next' or @content-desc='Next']"}
+      - {kind: coord, value: [778, 1308]}
+
+  captcha_answer_field:
+    note: "text-challenge input - WebView inputs surface as EditText"
+    strategies:
+      - {kind: class, value: "android.widget.EditText", nth: 0}
+      - {kind: coord, value: [540, 1180]}
+
+  captcha_hint:
+    note: "instruction line above the word, e.g. 'Type the text you see'"
+    strategies:
+      - {kind: label_contains, value: "type the"}
+      - {kind: label_contains, value: "enter the"}
+      - {kind: label_contains, value: "characters"}
+
+  captcha_error:
+    note: "R10: hCaptcha telling us the answer was wrong"
+    strategies:
+      - {kind: label_contains, value: "try again"}
+      - {kind: label_contains, value: "incorrect"}
+      - {kind: label_contains, value: "wrong"}
+      - {kind: label_contains, value: "didn't match"}
+      - {kind: label_contains, value: "does not match"}
+
+  captcha_skip_challenge:
+    strategies:
+      - {kind: xpath, value: "//android.widget.Button[@text='Skip Challenge' or @content-desc='Skip Challenge']"}
+      - {kind: label, value: "Skip Challenge"}
+      - {kind: coord, value: [778, 1308]}
+
+  captcha_language:
+    strategies:
+      - {kind: res, value: "language-list"}
+      - {kind: coord, value: [268, 1238]}
+
+  captcha_about:
+    strategies:
+      - {kind: res, value: "menu-info"}
+      - {kind: label_contains, value: "About hCaptcha"}
+      - {kind: coord, value: [277, 1302]}
+
+  # ---- post-captcha ---------------------------------------------------------
+  # TODO: text still unconfirmed - 11_after_skip_challenge will tell us.
+  pending_title:
+    strategies:
+      - {kind: label_contains, value: "erification"}
+      - {kind: label_contains, value: "Verify"}
+      - {kind: label_contains, value: "almost there"}
+
+  logged_in_marker:
+    note: "heuristic - confirm against the real main screen"
+    strategies:
+      - {kind: label_contains, value: "Friends"}
+      - {kind: label_contains, value: "Messages"}
+
+  # ---- shared ---------------------------------------------------------------
+  clear_button:
+    strategies:
+      - {kind: label, value: "Clear"}
+
+  go_back_button:
+    strategies:
+      - {kind: label, value: "Go back"}
+
+# -----------------------------------------------------------------------------
+# STATES - priority desc. Higher wins. detect lists are disjoint.
+# -----------------------------------------------------------------------------
+states:
+
+  shade:              {priority: 99, detect: [shade_marker]}
+
+  welcome:            {priority: 95, detect: [welcome_title], require_all: true}
+
+  human_check:        {priority: 90, detect: [human_check_title]}
+
+  dob_picker:         {priority: 88, detect: [dob_confirm], require_all: true}
+
+  captcha_wrapper:    {priority: 85, detect: [captcha_prompt, captcha_skip_challenge], require_all: true}
+
+  logged_in:          {priority: 80, detect: [logged_in_marker]}
+
+  identify:           {priority: 70, detect: [identify_title]}
+
+  register_name:      {priority: 70, detect: [name_title]}
+
+  register_form:      {priority: 70, detect: [form_title]}
+
+  register_dob:       {priority: 70, detect: [dob_title]}
+
+  pending_verify:     {priority: 60, detect: [pending_title]}
+
+  captcha_iframe:     {priority: 55, detect: [captcha_webview, captcha_close], require_all: true}
+
+  phone_error:        {priority: 20, detect: [phone_error]}
+
+  dob_error_modal:    {priority: 10, detect: [dob_error]}
+
+  error_modal:        {priority: 5,  detect: [error_banner]}

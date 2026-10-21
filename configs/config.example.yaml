@@ -1,0 +1,86 @@
+# cp configs/config.example.yaml configs/config.yaml
+# Env overrides: DCGEN_<section>__<attr>, e.g. DCGEN_EMAIL__DOMAIN=you.dev
+
+emulator:
+  prefix: "dcgen-"
+  mem_mb: 1536
+  cores: 2
+  data_partition: "2048M"
+  heap_mb: 256
+  snapshot: "clean"
+  gpu_headless: "swiftshader_indirect"
+  gpu_windowed: "host"
+  writable_system: true
+  console_port_base: 5554
+  adb_port_base: 5555
+  proxy_port_base: 8800
+  boot_timeout: 420
+  device_profile: "pixel_7"
+  image: "system-images;android-34;google_apis;arm64-v8a"
+
+device:
+  fix_resolution: true
+  width: 1080
+  height: 1920
+  dpi: 320
+  locale: "en-US"
+  timezone: "America/New_York"
+  match_proxy_timezone: true
+  disable_animations: true
+
+net:
+  proxy_file: "proxies.txt"
+  proxy_mode: "rotate"
+  no_proxy: false
+  mitm: false
+  handshake_timeout: 10
+  dead_cooldown: 60
+
+email:
+  source: "catchall"
+  domain: ""
+  base: ""
+  inbox_open: "auto"
+  inbox_search: "https://mail.google.com/mail/u/0/#search/to%3A{addr}"
+  verify_mode: "paste"
+  verify_timeout: 1800
+
+human:
+  mode: "park"
+  auto_captcha: true
+  captcha_timeout: 900
+  webhook: ""
+
+sms:
+  enabled: false
+  provider: ""
+  key: ""
+  country: ""
+  max_price: 0.0
+  retries: 2
+  release_phone: false
+
+app:
+  apk: null
+  version: "0.0.0"
+  build_number: 0
+  package: "com.discord"
+  activity: "com.discord/.main.MainActivity"
+  browser: "com.android.chrome"
+
+run:
+  count: 1
+  batch: 0
+  concurrency: 0
+  instances: [0, 1]
+  backend: "avd"
+  dry_run: false
+  report: false
+  capture_on_fail: true
+  keep_open: false
+  fresh_app: false
+  rotate_identity: false
+  from_step: "auto"
+  min_submit_gap: 20.0
+  caffeinate: true
+  dashboard: "plain"

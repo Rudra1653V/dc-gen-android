@@ -1,0 +1,9 @@
+[17:40:39] logging to /Users/bhoomiagro/Downloads/dc-gen-android/outputs/logs/run-20261020-174039.log
+[17:40:41] pinned discord.apk v349.9 - Stable build 349009 (f80e3a58d64d)
+[17:40:41] selectors.yaml stamped: app 349.9 - Stable build 349009
+[17:40:41] created AVD dcgen-0 (pixel_7)
+[17:40:41] dcgen-0 launching (headless=True, proxy=none)
+[17:41:10] dcgen-0 booted
+[17:41:10] -prop did not land on dcgen-0; using build.prop rewrite
+[17:41:10] prepping dcgen-0
+[17:41:24] identity set: google/panther/panther: f3f8b2f5

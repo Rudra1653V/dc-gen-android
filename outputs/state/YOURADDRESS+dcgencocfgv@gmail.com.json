@@ -1,0 +1,18 @@
+{
+  "email": "YOURADDRESS+dcgencocfgv@gmail.com",
+  "password": "N24Untom6d8jW5Ks",
+  "username": "cEfUNFJXLYrY",
+  "display_name": "Lunarwave",
+  "token": "",
+  "user_id": "",
+  "instance": 0,
+  "state": "FAILED",
+  "created": 1792502174.012023,
+  "proxy_ip": "",
+  "failure": "E_UI_ELEMENT_MISSING",
+  "detail": "never reached state ('register_form',); saw ['pending_verify']",
+  "timings": {
+    "PREPARED": 0.0
+  },
+  "attempts": 0
+}

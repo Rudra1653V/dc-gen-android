@@ -1,0 +1,18 @@
+{
+  "email": "YOURADDRESS+dcgenwfxhs3@gmail.com",
+  "password": "efEMrGbIgkzo0rEu",
+  "username": "Jf8NtGxhUhpg",
+  "display_name": "Vegaglow",
+  "token": "",
+  "user_id": "",
+  "instance": 0,
+  "state": "FAILED",
+  "created": 1792503269.700932,
+  "proxy_ip": "",
+  "failure": "E_UI_ELEMENT_MISSING",
+  "detail": "unparseable dump: syntax error: line 1, column 0",
+  "timings": {
+    "PREPARED": 0.0
+  },
+  "attempts": 0
+}

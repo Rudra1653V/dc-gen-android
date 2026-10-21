@@ -1,0 +1,10 @@
+[18:08:00] logging to /Users/bhoomiagro/Downloads/dc-gen-android/outputs/logs/run-20261020-180800.log
+[18:08:01] dcgen-0 launching (headless=True, proxy=none)
+[18:08:08] dcgen-0 booted
+[18:08:08] -prop did not land on dcgen-0; using build.prop rewrite
+[18:08:08] prepping dcgen-0
+[18:08:10] identity set: google/panther/panther: f3f8b2f5
+[18:08:13] dcgen-0 prepped
+[18:08:25] dcgen-0 snapshot 'clean' saved
+[18:08:25] dcgen-0 stopped
+[18:08:25] setup complete - 'clean' is the batch baseline

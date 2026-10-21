@@ -1,0 +1,15 @@
+[18:31:42] logging to /Users/bhoomiagro/Downloads/dc-gen-android/outputs/logs/run-20261020-183142.log
+[18:31:42] dcgen-0 launching (headless=True, proxy=none)
+[18:31:54] dcgen-0 booted
+[18:31:54] -prop did not land on dcgen-0; using build.prop rewrite
+[18:31:54] prepping dcgen-0
+[18:32:00] dcgen-0 wrote /vendor/build.prop
+[18:32:00] dcgen-0 wrote /system/build.prop
+[18:32:00] identity set: google/panther/panther: f3f8b2f5
+[18:32:03] dcgen-0 prepped
+[18:32:03] dcgen-0 rebooting to apply build.prop
+[18:32:23] dcgen-0 booted
+[18:32:24] fingerprint verified on dcgen-0: Pixel 7
+[18:32:33] dcgen-0 snapshot 'clean' saved
+[18:32:33] dcgen-0 stopped
+[18:32:33] setup complete - 'clean' is the batch baseline

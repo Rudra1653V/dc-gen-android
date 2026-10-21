@@ -1,0 +1,10 @@
+# dc-gen-android — Python 3.11/3.12 only
+rich>=13.7
+PyYAML>=6.0
+requests>=2.31
+tls-client>=1.0
+uiautomator2>=3.2
+adbutils>=2.5
+opencv-python>=4.9
+pytesseract>=0.3.10
+mitmproxy>=10.2

@@ -1,0 +1,90 @@
+# =============================================================================
+# dc-gen-android :: configuration
+# Written by tools/setup.py - safe to hand-edit.
+# =============================================================================
+
+run:
+  accounts: 2
+  emulators: 1
+  max_consecutive_failures: 3
+  cooldown_s: 12.0
+  avd_base_name: "dcgen"
+  dry_run: false
+
+emulator:
+  auto_boot: true
+  headless: true
+  no_snapshot_load: true
+  ram_mb: 2560
+  base_port: 5554
+  boot_timeout_s: 300
+  extra_args: []
+
+accounts:
+  # gmail-plus | file
+  email_source: "gmail-plus"
+  email_base: "dondon1.19877@gmail.com"
+  # {n} becomes the account number.
+  tag_pattern: "1"
+  email_file: "emails.txt"
+  password: "dondon1@19877"
+  start_index: 1
+
+identity:
+  # adjective_noun | email_local | list
+  name_style: "email_local"
+  display_names: []
+  name_separator: ""
+  name_max_len: 20
+  name_adjectives: []
+  name_nouns: []
+
+  # word_digits | email_local | digits
+  username_style: "word_digits"
+  username_prefix: ""
+  username_digits: 4
+  username_separator: ""
+  username_max_len: 20
+  username_words: []
+
+  used_names_file: "state/used_names.txt"
+  used_usernames_file: "state/used_usernames.txt"
+
+dob:
+  year_min: 1998
+  year_max: 2005
+  day_max: 28
+  pin_year: 0
+  pin_month: 0
+  pin_day: 0
+
+captcha:
+  # human | auto | skip
+  mode: "human"
+  human_timeout_s: 600
+  beep: true
+  auto_rounds: 10
+
+flow:
+  retries: 2
+  submit_timeout_s: 45
+  captcha_wait_s: 25
+  fresh_per_account: true
+
+proxy:
+  enabled: false
+  file: "proxies.txt"
+
+output:
+  dir: "accounts"
+  format: "both"
+  credentials_file: "state/credentials.txt"
+
+artifacts:
+  dir: "artifacts"
+  snap_every_step: false
+  keep_success_artifacts: false
+
+logging:
+  level: "info"
+  prefix_serial: true

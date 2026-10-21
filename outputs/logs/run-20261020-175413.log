@@ -1,0 +1,12 @@
+[17:54:13] logging to /Users/bhoomiagro/Downloads/dc-gen-android/outputs/logs/run-20261020-175413.log
+[17:54:15] pinned discord.xapk v349.9 - Stable build 349009 (ebc80f8e5b36)
+[17:54:15] selectors.yaml stamped: app 349.9 - Stable build 349009
+[17:54:15] dcgen-0 already booted
+[17:54:15] dcgen-0 booted
+[17:54:15] -prop did not land on dcgen-0; using build.prop rewrite
+[17:54:15] prepping dcgen-0
+[17:54:18] identity set: google/panther/panther: f3f8b2f5
+[17:54:20] dcgen-0 prepped
+[17:54:26] dcgen-0 snapshot 'clean' saved
+[17:54:26] dcgen-0 stopped
+[17:54:26] setup complete - 'clean' is the batch baseline

@@ -1,0 +1,8 @@
+[18:32:34] logging to /Users/bhoomiagro/Downloads/dc-gen-android/outputs/logs/run-20261020-183234.log
+[18:32:36] dcgen-0 launching (headless=True, proxy=none)
+[18:32:43] dcgen-0 booted
+[18:32:45] identity set: google/panther/panther: f3f8b2f5
+[18:32:45] === batch 1 (1 account(s)) ===
+[18:33:15] nobody reached the pending state
+[18:33:15] done - 0 verified, 1 failed
+[18:33:15] dcgen-0 stopped
