@@ -329,10 +329,15 @@ class Ui:
 
     def wait_gone(self, name: str, timeout: float = 30) -> None:
         """STRICT: a coord fallback must not pin an element 'present' forever."""
+        if not self.wait_gone_ok(name, timeout):
+            raise DCGenError(FailureCode.E_UI_ELEMENT_MISSING,
+                             f"{name!r} still present after {timeout}s")
+
+    def wait_gone_ok(self, name: str, timeout: float = 30) -> bool:
+        """Non-raising variant: True once it is gone, False on timeout."""
         deadline = time.time() + timeout
         while time.time() < deadline:
             if not self.exists_strict(name):
-                return
+                return True
             time.sleep(0.4)
-        raise DCGenError(FailureCode.E_UI_ELEMENT_MISSING,
-                         f"{name!r} still present after {timeout}s")
+        return False
