@@ -10,8 +10,7 @@ and Discord's React Native tree emits no `<?xml` declaration. Slicing on
 `find("<?xml")` therefore does nothing and ET.fromstring dies with
 "syntax error: line 1, column 0". It ALSO appends the same message after
 </hierarchy> on some builds. `_sanitise` slices on the outermost angle brackets
-instead. The CLI also refuses to dump while the app animates, so `dump()`
-retries.
+instead. The CLI also refuses to dump while the app animates, so `dump()` retries.
 
 APP LAUNCH - read this before changing `start_app()`:
 `am start -n <pkg>/<activity>` fails silently if the activity name is wrong, and
@@ -34,6 +33,7 @@ from core.log import log
 from core.token import TOKEN_RE
 
 DUMP_TTL = 1.5
+FOREGROUND_TTL = 1.0
 BOUNDS_RE = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
 
 
@@ -52,6 +52,14 @@ class Found:
     x: int
     y: int
     node: object
+    #: False when the hit came from a coord/ocr fallback rather than the tree.
+    #: exists() is deliberately non-strict, so this is informational there;
+    #: exists_strict() and wait_gone() use it to reject fallbacks.
+    confident: bool = True
+
+    def __str__(self) -> str:
+        return f"{self.by}={self.value!r} at ({self.x}, {self.y})" + (
+            "" if self.confident else " [fallback]")
 
 
 class Device:
@@ -67,6 +75,7 @@ class Device:
         self._u2 = None
         self._u2_tried = False
         self._dump_cache: tuple[float, ET.Element] | None = None
+        self._fg_cache: tuple[float, str] | None = None
         self._last_raw: str | None = None
         self._size: tuple[int, int] | None = None
 
@@ -154,12 +163,17 @@ class Device:
     def dump_is_fresh(self) -> bool:
         return bool(self._dump_cache and time.time() - self._dump_cache[0] < DUMP_TTL)
 
+    @property
+    def dump_generation(self) -> float:
+        """Stamp of the cached dump, for one-screencap-per-dump."""
+        return self._dump_cache[0] if self._dump_cache else 0.0
+
     @staticmethod
-    def nodes(root: ET.Element) -> list[ET.Element]:
+    def nodes(root: ET.Element) -> list:
         return list(root.iter("node"))
 
     @staticmethod
-    def bounds_of(node: ET.Element) -> tuple[int, int, int, int] | None:
+    def bounds_of(node) -> tuple[int, int, int, int] | None:
         m = BOUNDS_RE.match(node.get("bounds") or "")
         if not m:
             return None
@@ -169,7 +183,16 @@ class Device:
         return x1, y1, x2, y2
 
     @staticmethod
-    def centre_of(node: ET.Element) -> tuple[int, int] | None:
+    def visible(node) -> bool:
+        return Device.bounds_of(node) is not None
+
+    @staticmethod
+    def label(node) -> str:
+        """R1: a Button's label lives in content-desc, not text."""
+        return (node.get("content-desc") or "") or (node.get("text") or "")
+
+    @staticmethod
+    def centre_of(node) -> tuple[int, int] | None:
         b = Device.bounds_of(node)
         if not b:
             return None
@@ -187,6 +210,13 @@ class Device:
         self.invalidate()
         time.sleep(0.2)
 
+    def keyevent(self, code: int) -> None:
+        """KEYCODE_*. 4 = BACK, 66 = ENTER, 67 = DEL - none of these navigate
+        when there is no keyboard up, which is why the flow never uses ESC."""
+        self.shell(f"input keyevent {int(code)}", check=False)
+        self.invalidate()
+        time.sleep(0.15)
+
     def type_text(self, value: str) -> None:
         d = self.u2
         if d is not None:
@@ -199,6 +229,10 @@ class Device:
         self.shell("input text " + _escape_input(value), check=False)
         self.invalidate()
         time.sleep(0.2)
+
+    def enter(self) -> None:
+        self.keyevent(66)
+        time.sleep(0.3)
 
     def hide_keyboard(self) -> None:
         # ESC dismisses the IME without navigating back
@@ -220,13 +254,18 @@ class Device:
         return self._u2
 
     # ---- app control -----------------------------------------------------
-    def foreground(self) -> str:
+    def foreground(self, ttl: float = FOREGROUND_TTL) -> str:
+        if self._fg_cache and time.time() - self._fg_cache[0] < ttl:
+            return self._fg_cache[1]
+        focus = ""
         for cmd in ("dumpsys window | grep -m1 mCurrentFocus",
                     "dumpsys activity activities | grep -m1 mResumedActivity"):
             out = self.shell(cmd, check=False)
             if out.strip():
-                return out.strip()
-        return ""
+                focus = out.strip()
+                break
+        self._fg_cache = (time.time(), focus)
+        return focus
 
     def start_app(self) -> None:
         """Launch and VERIFY. A silent am start leaves us on the home screen,
@@ -239,6 +278,7 @@ class Device:
             last = self.adb("shell", "am", "start", "-W", "-n", f"{pkg}/{act}",
                             check=False, timeout=30)
             time.sleep(2)
+            self._fg_cache = None
             if pkg.split(".")[-1] in self.foreground().lower():
                 log(f"launched {pkg}/{act}")
                 self.invalidate()
@@ -247,6 +287,7 @@ class Device:
         self.shell(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1",
                    check=False)
         time.sleep(3)
+        self._fg_cache = None
         fg = self.foreground()
         if pkg.split(".")[-1] not in fg.lower():
             raise DCGenError(
