@@ -14,10 +14,13 @@ finalize -> all clear -> repeat.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -30,6 +33,7 @@ from core.state import RunLock, Store
 from device import selectors as sel_mod
 
 DEFAULT_CONFIG = "configs/config.yaml"
+APK_PIN = Path("configs/apk.json")
 
 
 # ---------------------------------------------------------------------------
@@ -61,24 +65,35 @@ def _plan(cfg) -> None:
     print("=" * 68)
 
 
+def _pin_apk(path: Path) -> None:
+    """Record the APK path + digest so doctor can prove it has not moved."""
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    data = json.loads(APK_PIN.read_text()) if APK_PIN.exists() else {}
+    data.update({"apk": str(path), "sha256": digest})
+    APK_PIN.parent.mkdir(parents=True, exist_ok=True)
+    APK_PIN.write_text(json.dumps(data, indent=2) + "\n")
+    log(f"pinned {path.name} sha256={digest[:12]}")
+
+
 # ---------------------------------------------------------------------------
 # commands
 # ---------------------------------------------------------------------------
 def cmd_doctor(cfg, backend, args) -> int:
     problems = []
+    warnings = []
 
     for tool in ("adb", "emulator", "avdmanager"):
         if not shutil.which(tool):
             problems.append(f"{tool} not on PATH")
     if not shutil.which("tesseract"):
-        problems.append("tesseract missing - OCR captcha fallback is off")
+        warnings.append("tesseract missing - the OCR captcha fallback is off")
 
     try:
         book = sel_mod.load(cfg.paths.selectors)
         for p in sel_mod.validate(book):
             problems.append(f"selectors.yaml: {p}")
-        log(f"selectors: {len(book.elements)} elements, "
-            f"{len(book.states)} states, v{book.meta.get('version', '?')}")
+        log(f"selectors: {len(book.elements)} elements, {len(book.states)} states, "
+            f"v{book.meta.get('version', '?')}")
     except Exception as exc:
         problems.append(f"selectors.yaml unreadable: {exc}")
 
@@ -92,10 +107,38 @@ def cmd_doctor(cfg, backend, args) -> int:
         if not snap.exists():
             problems.append(f"AVD {cfg.avd_name(idx)} has no "
                             f"'{cfg.emulator.snapshot}' snapshot")
+        elif backend.is_booted(idx):
+            pkgs = backend.adb_run(idx, "shell", "pm", "list", "packages",
+                                   cfg.app.package, check=False)
+            if cfg.app.package not in pkgs:
+                problems.append(f"{cfg.avd_name(idx)} is booted but "
+                                f"{cfg.app.package} is not installed")
+            else:
+                log(f"{cfg.avd_name(idx)}: {cfg.app.package} present, booted")
 
-    if cfg.app.apk and not Path(cfg.app.apk).exists():
-        problems.append(f"app.apk not found: {cfg.app.apk}")
-    if cfg.net.mitm and not (Path.home() / ".mitmproxy" / "mitmproxy-ca-cert.pem").exists():
+    # ---- APK pin ---------------------------------------------------------
+    if cfg.app.apk:
+        apk = Path(cfg.app.apk).expanduser()
+        if not apk.exists():
+            problems.append(f"app.apk not found: {apk}")
+        elif APK_PIN.exists():
+            pinned = json.loads(APK_PIN.read_text()).get("sha256", "")
+            live = hashlib.sha256(apk.read_bytes()).hexdigest()
+            if pinned and pinned != live:
+                problems.append(f"app.apk differs from configs/apk.json "
+                                f"({live[:12]} != {pinned[:12]})")
+    else:
+        warnings.append("app.apk unset - the APK checks are all skipped")
+
+    # ---- Super-Properties version ---------------------------------------
+    if cfg.app.version in ("", "0.0.0"):
+        problems.append("[app] version is unset - X-Super-Properties will "
+                        "impersonate 0.0.0 and Discord may reject it")
+    if cfg.app.build_number == 0:
+        warnings.append("[app] build_number is 0")
+
+    if cfg.net.mitm and not (Path.home() / ".mitmproxy"
+                             / "mitmproxy-ca-cert.pem").exists():
         problems.append("mitm enabled but ~/.mitmproxy/mitmproxy-ca-cert.pem missing")
     if not cfg.net.no_proxy and not Path(cfg.net.proxy_file).exists():
         problems.append(f"proxy_file not found: {cfg.net.proxy_file} "
@@ -103,19 +146,27 @@ def cmd_doctor(cfg, backend, args) -> int:
 
     for p in problems:
         log(f"  !! {p}", "err")
-    log("doctor: OK" if not problems else f"doctor: {len(problems)} problem(s)",
-        "ok" if not problems else "err")
-    return 1 if problems else 0
+    for w in warnings:
+        log(f"  ~  {w}", "warn")
+    if problems:
+        log(f"doctor: {len(problems)} problem(s), {len(warnings)} warning(s)", "err")
+        return 1
+    log(f"doctor: OK ({len(warnings)} warning(s))", "ok")
+    return 0
 
 
 def cmd_setup(cfg, backend, args) -> int:
     cfg.paths.ensure()
     if args.apk:
         cfg.app.apk = args.apk
+    if cfg.app.apk:
+        _pin_apk(Path(cfg.app.apk).expanduser())
+
     for idx in cfg.run.instances:
         name = cfg.avd_name(idx)
         if args.force or idx not in {i.idx for i in backend.list_instances()}:
             backend.create(name)
+
     for idx in cfg.run.instances:
         backend.start(idx)
         backend.wait_booted(idx)
@@ -126,6 +177,7 @@ def cmd_setup(cfg, backend, args) -> int:
             from tools import ca_install
             ca_install.install(backend, idx)
         backend.snapshot(idx, cfg.emulator.snapshot)
+
     backend.stop_all()
     log(f"setup complete - snapshot '{cfg.emulator.snapshot}' saved", "ok")
     return 0
@@ -150,28 +202,16 @@ def cmd_recon(cfg, backend, args) -> int:
                 out = cfg.paths.shots / f"{name}_inst{idx}"
                 out.mkdir(parents=True, exist_ok=True)
                 (out / "hierarchy.xml").write_text(
-                    __import__("xml.etree.ElementTree", fromlist=["tostring"])
-                    .tostring(root, encoding="unicode"))
+                    ET.tostring(root, encoding="unicode"))
                 (out / "screen.png").write_bytes(dev.screenshot_png())
                 log(f"inst-{idx} state={ctx.ui(idx).state()} -> {out}")
-                if name == "01_identify":
-                    if ctx.ui(idx).tap_if("register_button"):
-                        ctx.ui(idx).wait_state(["identify"], 20)
+                if name == "01_identify" and ctx.ui(idx).tap_if("register_button"):
+                    ctx.ui(idx).wait_state(["identify"], 20)
         return 0
     finally:
         human.stop()
         if not cfg.run.keep_open:
             backend.stop_all()
-
-
-def _with_lock(cfg, fn) -> int:
-    cfg.paths.ensure()
-    lock = RunLock(cfg.paths.run_lock)
-    lock.acquire(force=getattr(fn, "force", False))
-    try:
-        return fn()
-    finally:
-        lock.release()
 
 
 def cmd_run(cfg, backend, args) -> int:
@@ -189,13 +229,11 @@ def cmd_run(cfg, backend, args) -> int:
 
 
 def cmd_finalize(cfg, backend, args) -> int:
-    store = Store(cfg.paths)
-    return orchestrator.finalize_pending(cfg, backend, store)
+    return orchestrator.finalize_pending(cfg, backend, Store(cfg.paths))
 
 
 def cmd_resume(cfg, backend, args) -> int:
-    store = Store(cfg.paths)
-    return orchestrator.resume(cfg, backend, store)
+    return orchestrator.resume(cfg, backend, Store(cfg.paths))
 
 
 COMMANDS = {
@@ -206,6 +244,7 @@ COMMANDS = {
     "finalize": cmd_finalize,
     "resume": cmd_resume,
 }
+LOCKED = ("run", "finalize", "resume")
 
 
 # ---------------------------------------------------------------------------
@@ -254,13 +293,13 @@ def main(argv=None) -> int:
     log_file = start_file(cfg.paths.logs / "dcgen.log")
 
     try:
-        backend = build_backend(cfg, windowed=args.windowed)
-    except DCGenError as exc:
-        log(f"{exc}", "err")
-        return 3
+        try:
+            backend = build_backend(cfg, windowed=args.windowed)
+        except DCGenError as exc:
+            log(f"{exc}", "err")
+            return 3
 
-    try:
-        if args.command in ("run", "finalize", "resume"):
+        if args.command in LOCKED:
             cfg.paths.ensure()
             lock = RunLock(cfg.paths.run_lock)
             lock.acquire(force=args.force)
@@ -271,7 +310,6 @@ def main(argv=None) -> int:
         return COMMANDS[args.command](cfg, backend, args)
     finally:
         stop_file()
-        log(f"log -> {log_file}")
 
 
 if __name__ == "__main__":

@@ -92,9 +92,9 @@ def load(path) -> Book:
     path = Path(path)
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     book = Book(path=path, meta=raw.get("meta") or {})
-    if "screen" in raw and "screen" not in book.meta:
-        book.meta["screen"] = raw["screen"]
-    default_timeout = book.default_timeout
+    if "version" in raw:
+        book.meta.setdefault("version", raw["version"])
+        default_timeout = book.default_timeout
 
     for name, spec in (raw.get("elements") or {}).items():
         spec = spec or {}
