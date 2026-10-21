@@ -202,6 +202,17 @@ class Signup:
         for n in [x for x in Device.nodes(self.dev.dump())
                   if x.get("clickable") == "true"][:10]:
             log(f"      clickable: {Device.label(n)!r} at {Device.centre_of(n)}")
+    
+    def _dump_labels(self) -> None:
+        """Everything with text/desc on screen, so a state miss is diagnosable
+        from the log alone without chasing the artifacts dir."""
+        log("   --- on screen ---")
+        for n in Device.nodes(self.dev.dump(cached=False)):
+            label = Device.label(n)
+            if label:
+                log(f"      {str(n.get('class', '?')).split('.')[-1]:22} "
+                    f"{str(Device.centre_of(n)):14} {label!r}")
+        log("   -----------------")
 
     def _tap_until(self, element, expect_state, retries=None, timeout=12, focus=None):
         retries = retries or self.cfg.flow.retries + 1
@@ -228,7 +239,7 @@ class Signup:
                 log(f"   tap {element} at ({hit.x}, {hit.y}) via {hit.by}")
                 self.dev.tap_xy(hit.x, hit.y)
 
-            got = self.ui.wait_state([expect_state, "welcome", "error_modal"], timeout)
+            got = self.ui.wait_state_ok([expect_state, "welcome", "error_modal"], timeout)
             if got == expect_state:
                 time.sleep(0.4)
                 return got
@@ -244,6 +255,7 @@ class Signup:
             if attempt == retries - 1:
                 self._log_clickables()
             time.sleep(0.8)
+        self._dump_labels()
         raise DCGenError(FailureCode.E_UI_ELEMENT_MISSING,
                          f"{expect_state} never reached; state={self._state()}")
 
@@ -264,7 +276,11 @@ class Signup:
 
     # ---- steps -----------------------------------------------------------
     def step_welcome(self):
-        return self._tap_until("register_button", "identify", 2, 20)
+        if "identify" in self._state():
+            return "identify"
+        # the app shows a splash first; tapping through it does nothing
+        self.ui.wait_state_ok(["welcome", "identify"], 30)
+        return self._tap_until("register_button", "identify", 3, 20)
 
     def step_identify(self, tries=3):
         last = None
@@ -301,7 +317,7 @@ class Signup:
                                  f"not on identify, state={self._state()}")
             hit = self.ui.tap("email_next_button")
             log(f"   tap 'Next' at ({hit.x}, {hit.y}) via {hit.by}")
-            got = self.ui.wait_state(["register_name", "phone_error"], 12)
+            got = self.ui.wait_state_ok(["register_name", "phone_error"], 12)
             if got == "register_name":
                 time.sleep(0.4)
                 return "register_name"
@@ -422,7 +438,7 @@ class Signup:
         if "captcha_wrapper" in st:
             return True
         if "captcha_iframe" not in st:
-            self.ui.wait_state(["captcha_iframe", "captcha_wrapper"], 20)
+            self.ui.wait_state_ok(["captcha_iframe", "captcha_wrapper"], 20)
             st = self._state()
         if "captcha_wrapper" in st:
             return True

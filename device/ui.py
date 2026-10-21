@@ -291,6 +291,13 @@ class Ui:
 
     # ---- states ----------------------------------------------------------
     def state(self) -> str | None:
+        """Highest-priority matching state.
+
+        R5: detection uses exists_strict(), NOT exists(). A coord fallback is a
+        false positive for a screen check - dob_confirm's coord sits at
+        (842,1251), which every screen contains, so with the non-strict form
+        dob_picker matches everywhere and shadows the real state.
+        """
         try:
             matches = []
             for name, s in self.book.states.items():
@@ -298,9 +305,9 @@ class Ui:
                 if not detect:
                     continue
                 if getattr(s, "require_all", False):
-                    ok = all(self.exists(d) for d in detect)
+                    ok = all(self.exists_strict(d) for d in detect)
                 else:
-                    ok = any(self.exists(d) for d in detect)
+                    ok = any(self.exists_strict(d) for d in detect)
                 if ok:
                     matches.append(name)
         except DCGenError:
@@ -310,22 +317,32 @@ class Ui:
         return max(matches, key=lambda n: (self.book.states[n].priority,
                                            len(self.book.states[n].detect)))
 
-    def wait_state(self, want, timeout: float | None = None) -> str:
+    def wait_state_ok(self, want, timeout: float | None = None) -> str | None:
+        """Non-raising: the matching state name, or None on timeout.
+
+        The tap-retry ladders need this - wait_state() raising means the caller
+        never gets to try a second tap.
+        """
         wants = (want,) if isinstance(want, str) else tuple(want)
         limit = timeout or self.book.states[wants[0]].timeout
         deadline = time.time() + limit
-        seen: set = set()
         while time.time() < deadline:
             current = self.state()
-            if current:
-                seen.add(current)
             if current in wants:
                 return current
             time.sleep(0.5)
+        return None
+
+    def wait_state(self, want, timeout: float | None = None) -> str:
+        """Raising variant. Also dumps evidence on failure."""
+        wants = (want,) if isinstance(want, str) else tuple(want)
+        got = self.wait_state_ok(wants, timeout)
+        if got is not None:
+            return got
         self.device.capture_failure(f"state_{'_'.join(wants)}",
-                                    f"wanted {wants}, saw {sorted(seen)}")
+                                    f"wanted {wants}, saw {self.state()}")
         raise DCGenError(FailureCode.E_UI_ELEMENT_MISSING,
-                         f"never reached state {wants}; saw {sorted(seen)}")
+                         f"never reached state {wants}; saw {self.state()}")
 
     def wait_gone(self, name: str, timeout: float = 30) -> None:
         """STRICT: a coord fallback must not pin an element 'present' forever."""
