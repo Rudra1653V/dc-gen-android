@@ -373,23 +373,21 @@ class AvdBackend:
     def app_clear(self, idx: int) -> None:
         self.adb_run(idx, "shell", "pm", "clear", self.cfg.app.package)
 
-    def install_apk(self, idx: int, apk: Path) -> None:
-        from tools.apk_pin import is_bundle, _pick_base
-        if is_bundle(apk):
-            import tempfile
-            import zipfile
-            with tempfile.TemporaryDirectory() as td:
-                with zipfile.ZipFile(apk) as z:
-                    z.extractall(td)
-                base = _pick_base(td)
-                if base is None:
-                    raise DCGenError(FailureCode.E_APK_MISMATCH,
-                                     f"no .apk inside {apk.name}")
-                others = [p for p in sorted(Path(td).rglob("*.apk")) if p != base]
-                self.adb_run(idx, "install-multiple", "-r", str(base),
-                             *[str(p) for p in others], timeout=900)
-        else:
-            self.adb_run(idx, "install", "-r", str(apk), timeout=300)
+    def install_apk(self, idx: int, path: Path) -> None:
+    if path.suffix.lower() in (".xapk", ".apks"):
+        with tempfile.TemporaryDirectory() as td:
+            with zipfile.ZipFile(path) as z:
+                z.extractall(td)
+            apks = sorted(Path(td).rglob("*.apk"))
+            abi = self.abi                      # e.g. "arm64-v8a"
+            keep = [a for a in apks
+                    if a.name in ("base.apk", "com.discord.apk")
+                    or abi in a.name
+                    or a.name.startswith(("split_config.", "config."))]
+            self.adb_run(idx, "install-multiple", "-r", "-g",
+                         *[str(a) for a in (keep or apks)])
+            return
+    self.adb_run(idx, "install", "-r", "-g", str(path))
 
     def launch_app(self, idx: int) -> None:
         self.adb_run(idx, "shell", "am", "start", "-n", self.cfg.app.activity)
