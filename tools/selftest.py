@@ -35,6 +35,12 @@ EMPTY = """<hierarchy>
   <node class="android.widget.FrameLayout" bounds="[0,0][10,10]"/>
 </hierarchy>"""
 
+SCALED_COORD = """<hierarchy>
+  <node class="android.widget.FrameLayout" bounds="[0,0][2160,3840]"/>
+  <node class="android.widget.Button" text="Scaled target"
+        bounds="[900,1700][1300,2100]"/>
+</hierarchy>"""
+
 LAUNCHER_PKG = "com.google.android.apps.nexuslauncher"
 SYSTEM_PKG = "com.android.systemui"
 
@@ -70,9 +76,10 @@ class FakeStrategy:
 
 
 class FakeDevice:
-    def __init__(self, xml: str, foreground_pkg: str):
+    def __init__(self, xml: str, foreground_pkg: str, size=(1080, 1920)):
         self._root = ET.fromstring(xml)
         self._fg = foreground_pkg
+        self._size = size
         self._cache = (1.0, self._root)
 
     @property
@@ -87,7 +94,7 @@ class FakeDevice:
         return self._root
 
     def screen_size(self):
-        return (1080, 1920)
+        return self._size
 
     def foreground(self, ttl: float = 1.0):
         return self._fg
@@ -128,6 +135,8 @@ def _book() -> FakeBook:
         "second_edit": FakeEl(
             "second_edit",
             [FakeStrategy("xpath", "//android.widget.EditText", nth=1)]),
+        "scaled_coord": FakeEl(
+            "scaled_coord", [FakeStrategy("coord", [540, 960])]),
     }
     return FakeBook(states, elements)
 
@@ -188,6 +197,14 @@ def main() -> int:
     check("(//TAG)[last()] resolves to the last match", _last_edittext(ui), "Password")
     check("nth=1 picks the second EditText",
           ui.find("second_edit").y > ui.find("email_field").y, True)
+
+    print("\n6. coordinate fallbacks scale from the reference screen")
+    ui = Ui(FakeDevice(SCALED_COORD, "com.discord", size=(2160, 3840)),
+            _book())
+    hit = ui.find("scaled_coord")
+    check("scaled coord resolves on a 2x screen", hit is not None, True)
+    check("scaled coord uses the physical screen centre",
+          (hit.x, hit.y) if hit else None, (1080, 1920))
 
     print()
     if FAILURES:
